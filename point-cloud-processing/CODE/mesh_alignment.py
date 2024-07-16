@@ -11,6 +11,7 @@ from scipy.optimize import minimize
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from mpl_toolkits.mplot3d import Axes3D
 
+import geopandas as gpd
 from pyproj import Transformer
 from geopy.geocoders import Nominatim
 import time
@@ -71,7 +72,7 @@ def process_feature_list(collections_url, collection_id, feature_ids):
 
     for feature_id in feature_ids:
         feature_url = f"{collections_url}/{collection_id}/items/{feature_id}"
-        # logging.info(f"Processing feature: {feature_id}")
+        logging.info(f"Processing feature: {feature_id}")
         feature = fetch_json(feature_url)
         if feature:
             mesh, scale, translate = create_mesh_from_feature(feature, feature_id)
@@ -102,7 +103,10 @@ def visualize_glb_and_combined_meshes(mesh1, mesh2):
     triangles1 = np.asarray(mesh1.triangles)
     
     # Simplify the second mesh for visualization purposes
-    mesh2 = mesh2.simplify_quadric_decimation(1000) #1000
+    if mesh2.has_triangle_uvs():
+        mesh2.triangle_uvs = o3d.utility.Vector2dVector([])
+    
+    mesh2 = mesh2.simplify_quadric_decimation(1000) #1000 is the number of vertices after simplification
     vertices2 = np.asarray(mesh2.vertices)
     triangles2 = np.asarray(mesh2.triangles)
     
@@ -146,8 +150,6 @@ def load_and_transform_glb_model(file_path, translate):
         logging.error("The GLB model has no vertices or triangles.")
         return None
 
-    # logging.info(f"Original GLB model has {len(mesh.vertices)} vertices and {len(mesh.triangles)} triangles.")
-
     vertices = np.asarray(mesh.vertices)
     # Define the transformation matrix
     # Reflect the x-axis and remap y to z
@@ -164,7 +166,6 @@ def load_and_transform_glb_model(file_path, translate):
     mesh.vertices = o3d.utility.Vector3dVector(vertices)
     mesh.compute_vertex_normals()
 
-    # logging.info(f"Transformed GLB model has {len(mesh.vertices)} vertices and {len(mesh.triangles)} triangles.")
     return mesh
 
 def extract_2d_perimeter(mesh):
@@ -218,19 +219,39 @@ def calculate_intersection_error(params, perimeter1, perimeter2):
     return error
 
 
-def optimize_rotation_and_translation(perimeter1, perimeter2):
+def optimize_rotation_and_translation(perimeter1, perimeter2, num_attempts=5):
     """Find the optimal rotation angle and translation to align two perimeters by minimizing the intersection error."""
-    # Initial guess for the rotation angle and translations
-    initial_guess = [0.0, 0.0, 0.0]  # [angle, tx, ty]
+    best_result = None
+    lowest_error = float('inf')
+    initial_guesses = [
+        [-45.0, 0.0, 0.0],
+        [45.0, 0.0, 0.0],
+        [90.0, 0.0, 0.0],
+        [-90.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0]
+    ]
+    
     method = 'L-BFGS-B'  # Limited-memory Broyden-Fletcher-Goldfarb-Shanno algorithm
     bounds = [(-180, 180), (-np.inf, np.inf), (-np.inf, np.inf)]  # Bounds for [angle, tx, ty]
-    # Use the L-BFGS-B optimization method with bounds on the angle to [-180, 180]
-    # It iteratively minimizes the intersection error by adjusting the rotation angle and translations
-    result = minimize(calculate_intersection_error, initial_guess, args=(perimeter1, perimeter2), method=method, bounds=bounds)
-    # logging.info(f"Optimization result: {result}")
-    if not result.success:
-        logging.error(f"Optimization failed: {result.message}")
-    return result.x
+    
+    for attempt in range(min(num_attempts, len(initial_guesses))):
+        initial_guess = initial_guesses[attempt]
+        logging.info(f"Attempt {attempt + 1}: Initial guess = {initial_guess}")
+        
+        try:
+            result = minimize(calculate_intersection_error, initial_guess, args=(perimeter1, perimeter2), method=method, bounds=bounds)
+            if result.success and result.fun < lowest_error:
+                best_result = result
+                lowest_error = result.fun
+                logging.info(f"New best result found: {result.x} with error {result.fun}")
+        except Exception as e:
+            logging.error(f"Optimization attempt {attempt + 1} failed: {e}")
+    
+    if best_result is not None:
+        return best_result.x
+    else:
+        logging.error("All optimization attempts failed.")
+        return None
 
 
 def calculate_transformation_matrix(initial_transformation, angle, translation):
@@ -396,7 +417,7 @@ def main():
     print("\n")
     logging.info(f"Elapsed time: {elapsed_time:.3f} seconds")
 
-    # Calculate and print the transformation matrix
+    # Calculate and print the transformation matrix: the initial transformation matrix is a reflection of the x-axis and remapping of y to z
     initial_transformation = np.array([
         [-1, 0, 0],
         [0, 0, 1],
@@ -419,6 +440,13 @@ def main():
     error = calculate_intersection_error(optimal_params, perimeter1, perimeter2)
     logging.info(f"Intersection Error after optimization: {error:.5f} ")
 
+    # Save the latitute, longitude, and orientation to a text file in the Results folder
+    with open("RESULTS/lat_lon_orientation.txt", "w") as file:
+        file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f} degrees")
+
+
+    # Save optimized GLB mesh to a file with colors
+    # o3d.io.write_triangle_mesh("RESULTS/optimized_model.glb", glb_mesh)
 
 
 if __name__ == "__main__":
