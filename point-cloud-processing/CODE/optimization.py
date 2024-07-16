@@ -1,4 +1,3 @@
-import os
 import requests
 import json
 import numpy as np
@@ -57,7 +56,7 @@ def create_mesh_from_feature(feature, feature_id):
                             mesh.triangles.append([boundary[0][0], boundary[0][i], boundary[0][i + 1]])
 
         mesh.triangles = o3d.utility.Vector3iVector(mesh.triangles)
-        logging.info(f"Created mesh with {len(vertices)} vertices and {len(mesh.triangles)} triangles.")
+        # logging.info(f"Created mesh with {len(vertices)} vertices and {len(mesh.triangles)} triangles.")
         return mesh, scale, translate
     else:
         logging.error("No vertices found in the feature data.")
@@ -72,7 +71,7 @@ def process_feature_list(collections_url, collection_id, feature_ids):
 
     for feature_id in feature_ids:
         feature_url = f"{collections_url}/{collection_id}/items/{feature_id}"
-        logging.info(f"Processing feature: {feature_id}")
+        # logging.info(f"Processing feature: {feature_id}")
         feature = fetch_json(feature_url)
         if feature:
             mesh, scale, translate = create_mesh_from_feature(feature, feature_id)
@@ -95,19 +94,22 @@ def process_feature_list(collections_url, collection_id, feature_ids):
         logging.error("No meshes to visualize.")
         return None, None, None, None
 
+
+
 def visualize_glb_and_combined_meshes(mesh1, mesh2):
     """Visualize the GLB and combined meshes using Matplotlib."""
     vertices1 = np.asarray(mesh1.vertices)
     triangles1 = np.asarray(mesh1.triangles)
     
     # Simplify the second mesh for visualization purposes
-    mesh2 = mesh2.simplify_quadric_decimation(1000)
+    mesh2 = mesh2.simplify_quadric_decimation(1000) #1000
     vertices2 = np.asarray(mesh2.vertices)
     triangles2 = np.asarray(mesh2.triangles)
     
     # Create the figure and 3D axes
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], c='k', marker='o', s=5, label='3D BAG Mesh Vertices')
 
     # Create a 3D surface plot using plot_trisurf with a colormap
     ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap='winter', edgecolor='k', alpha=0.5)
@@ -135,18 +137,16 @@ def visualize_glb_and_combined_meshes(mesh1, mesh2):
     # Show the plot
     plt.show()
 
+
+
 def load_and_transform_glb_model(file_path, translate):
     """Load a GLB model, remap y to z, apply translation, and reflect the x-axis."""
-    if not os.path.exists(file_path):
-        logging.error(f"File not found: {file_path}")
-        return None
-    
     mesh = o3d.io.read_triangle_mesh(file_path)
     if not mesh.has_vertices() or not mesh.has_triangles():
         logging.error("The GLB model has no vertices or triangles.")
         return None
 
-    logging.info(f"Original GLB model has {len(mesh.vertices)} vertices and {len(mesh.triangles)} triangles.")
+    # logging.info(f"Original GLB model has {len(mesh.vertices)} vertices and {len(mesh.triangles)} triangles.")
 
     vertices = np.asarray(mesh.vertices)
     # Define the transformation matrix
@@ -164,7 +164,7 @@ def load_and_transform_glb_model(file_path, translate):
     mesh.vertices = o3d.utility.Vector3dVector(vertices)
     mesh.compute_vertex_normals()
 
-    logging.info(f"Transformed GLB model has {len(mesh.vertices)} vertices and {len(mesh.triangles)} triangles.")
+    # logging.info(f"Transformed GLB model has {len(mesh.vertices)} vertices and {len(mesh.triangles)} triangles.")
     return mesh
 
 def extract_2d_perimeter(mesh):
@@ -181,7 +181,7 @@ def extract_2d_perimeter(mesh):
 def visualize_2d_perimeters(perimeter1, perimeter2):
     """Visualize two 2D perimeters using Matplotlib."""
     fig, ax = plt.subplots()
-    ax.plot(perimeter1[:, 0], perimeter1[:, 1], 'g-', label='3D BAG Mesh Perimeter')
+    ax.plot(perimeter1[:, 0], perimeter1[:, 1], 'r-', label='3D BAG Mesh Perimeter')
     ax.plot(perimeter2[:, 0], perimeter2[:, 1], 'b-', label='GLB Mesh Perimeter')
     # Adjust legend position
     ax.legend(loc='upper right')
@@ -217,6 +217,7 @@ def calculate_intersection_error(params, perimeter1, perimeter2):
     logging.debug(f"Angle: {angle}, Translation: ({tx}, {ty}), Intersection Error: {error}")
     return error
 
+
 def optimize_rotation_and_translation(perimeter1, perimeter2):
     """Find the optimal rotation angle and translation to align two perimeters by minimizing the intersection error."""
     # Initial guess for the rotation angle and translations
@@ -226,10 +227,11 @@ def optimize_rotation_and_translation(perimeter1, perimeter2):
     # Use the L-BFGS-B optimization method with bounds on the angle to [-180, 180]
     # It iteratively minimizes the intersection error by adjusting the rotation angle and translations
     result = minimize(calculate_intersection_error, initial_guess, args=(perimeter1, perimeter2), method=method, bounds=bounds)
-    logging.info(f"Optimization result: {result}")
+    # logging.info(f"Optimization result: {result}")
     if not result.success:
         logging.error(f"Optimization failed: {result.message}")
     return result.x
+
 
 def calculate_transformation_matrix(initial_transformation, angle, translation):
     """Calculate the transformation matrix for the initial transformation, rotation angle and translation."""
@@ -275,10 +277,10 @@ def extract_latlon_orientation_from_json(feature):
             orientation = compute_orientation(np.array(latlon_vertices))
 
             # Extract first longitude and latitude as an example
-            lon, lat = latlon_vertices[0]
+            lat, lon = latlon_vertices[0]
 
-            logging.info(f"Longitude: {lon}, Latitude: {lat}, Orientation: {orientation} degrees")
-            return lon, lat, orientation
+            logging.info(f"Latitude: {lat}, Longitude: {lon}, , Orientation: {orientation} degrees")
+            return lat, lon, orientation
         else:
             logging.error("Transformation or reference system data missing in the feature.")
             return None, None, None
@@ -315,25 +317,26 @@ def extract_latlon_orientation_from_mesh(mesh, reference_system):
     latlon_vertices = np.array([transformer.transform(x, y) for x, y, z in vertices])
 
     # Compute orientation based on the convex hull's longest edge
-    orientation = compute_orientation(np.array(latlon_vertices))
+    orientation = compute_orientation(latlon_vertices)
 
-    # Extract first longitude and latitude as an example
-    lon, lat = latlon_vertices[0]
+    # Extract the lattitude, and longitude from the center of the mesh
+    lon, lat = np.mean(latlon_vertices, axis=0)
 
-    logging.info(f"Longitude: {lon}, Latitude: {lat}, Orientation: {orientation} degrees")
+
+    logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Orientation: {orientation:.5f} degrees")
     return lon, lat, orientation
 
 def transform_coordinates(lat, lon, reference_system):
-    """Transform coordinates to EPSG:4326 if they are not already in that reference system."""
+    """Transform coordinates to EPSG:7415 if they are not already in that reference system."""
     epsg_code = reference_system.split('/')[-1]
-    if epsg_code != '4326':
-        transformer = Transformer.from_crs(f"EPSG:{epsg_code}", "EPSG:4326", always_xy=True)
+    if epsg_code != '7415':
+        transformer = Transformer.from_crs(f"EPSG:{epsg_code}", "EPSG:7415", always_xy=True)
         lon, lat = transformer.transform(lon, lat)
     return lat, lon
 
 def get_geo_location(lat, lon, reference_system):
     """Given latitude and longitude, return the geo location using Nominatim."""
-    # Ensure coordinates are in EPSG:4326
+    # Ensure coordinates are in EPSG:7415
     lat, lon = transform_coordinates(lat, lon, reference_system)
     
     # Use Nominatim geolocator
@@ -358,25 +361,23 @@ def main():
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
-        data_folder = "TwinTopics/Data" # make it a relative path
-        glb_dataset = "model_2.glb"
+        data_folder = "DATA/" 
+        glb_dataset = "model.glb"
         glb_model_path = data_folder + glb_dataset
 
-        logging.info(f"GLB Model Path: {glb_model_path}")
-        
+
         glb_mesh = load_and_transform_glb_model(glb_model_path, translate)
         
         if glb_mesh:
             # Align the center of the GLB mesh with the feature mesh
             glb_mesh = align_mesh_centers(combined_mesh, glb_mesh)
-            
             perimeter1 = extract_2d_perimeter(combined_mesh)
             perimeter2 = extract_2d_perimeter(glb_mesh)
             
             # Optimize rotation and translation
             optimal_params = optimize_rotation_and_translation(perimeter1, perimeter2)
             optimal_angle, optimal_tx, optimal_ty = optimal_params
-            logging.info(f"Optimal Rotation Angle: {optimal_angle}, Translation: ({optimal_tx}, {optimal_ty})")
+            logging.info(f"Optimal Rotation Angle: {optimal_angle:.5f}, Translation: x= {optimal_tx:.5f}, y= {optimal_ty:.5f}")
             
             # Apply the optimal rotation and translation to the GLB mesh
             glb_mesh.rotate(glb_mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle))), center=glb_mesh.get_center())
@@ -386,16 +387,14 @@ def main():
 
             # Extract latitude, longitude, and orientation from the transformed GLB mesh vertices
             lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
-            logging.info(f"Transformed GLB Mesh - Longitude: {lon}, Latitude: {lat}, Orientation: {orientation} degrees")
             
             # Get the geo location using Nominatim
-            address = get_geo_location(lat, lon, reference_system)
-            if address:
-                logging.info(f"Geo Location: {address}")
-
+            get_geo_location(lat, lon, reference_system)
+            
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(f"Elapsed time: {elapsed_time:.3f} seconds")
+    print("\n")
+    logging.info(f"Elapsed time: {elapsed_time:.3f} seconds")
 
     # Calculate and print the transformation matrix
     initial_transformation = np.array([
@@ -405,15 +404,23 @@ def main():
     ])
     transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate + np.array([optimal_tx, optimal_ty, 0]))
     logging.info(f"Transformation Matrix:\n{transformation_matrix}")
-    np.savetxt("transformation_matrix.txt", transformation_matrix)
+    # Save the transformation matrix to a text file in the Results folder
+    np.savetxt("RESULTS/transformation_matrix.txt", transformation_matrix)
 
     # Visualize the combined mesh and transformed GLB mesh
     visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
-
+    
     # Visualize the 2D perimeters after applying the optimal rotation and translation
     rotated_perimeter2 = rotate(Polygon(perimeter2), optimal_angle, origin='centroid')
     translated_rotated_perimeter2 = np.array(rotated_perimeter2.exterior.coords) + [optimal_tx, optimal_ty]
     visualize_2d_perimeters(perimeter1, translated_rotated_perimeter2)
 
+    # Print the error after optimization
+    error = calculate_intersection_error(optimal_params, perimeter1, perimeter2)
+    logging.info(f"Intersection Error after optimization: {error:.5f} ")
+
+
+
 if __name__ == "__main__":
     main()
+
