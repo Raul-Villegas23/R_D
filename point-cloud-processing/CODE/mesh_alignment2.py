@@ -377,7 +377,7 @@ def main():
 
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"]
+    feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
 
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
     

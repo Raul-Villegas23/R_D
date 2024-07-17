@@ -8,6 +8,8 @@ from scipy.spatial import ConvexHull
 from shapely.geometry import Polygon
 from shapely.affinity import rotate
 from scipy.optimize import minimize
+from sklearn.decomposition import PCA
+
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -179,18 +181,62 @@ def extract_2d_perimeter(mesh):
 
     return perimeter_points
 
-def visualize_2d_perimeters(perimeter1, perimeter2):
-    """Visualize two 2D perimeters using Matplotlib."""
+def calculate_centroid(perimeter):
+    """Calculate the centroid of a given perimeter using Shapely."""
+    polygon = Polygon(perimeter)
+    centroid = polygon.centroid
+    return np.array([centroid.x, centroid.y])
+
+
+
+
+def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
+    """Visualize three 2D perimeters, their centroids, orientations, and longest edges using Matplotlib."""
     fig, ax = plt.subplots()
     ax.plot(perimeter1[:, 0], perimeter1[:, 1], 'r-', label='3D BAG Mesh Perimeter')
     ax.plot(perimeter2[:, 0], perimeter2[:, 1], 'b-', label='GLB Mesh Perimeter')
-    # Adjust legend position
-    ax.legend(loc='upper right')
-    ax.set_title('2D Perimeters')
+    ax.plot(perimeter3[:, 0], perimeter3[:, 1], 'g--', label='Non-aligned Perimeter')  # Dashed lines for the third perimeter
 
+    # Calculate and plot centroids
+    centroid1 = calculate_centroid(perimeter1)
+    centroid2 = calculate_centroid(perimeter2)
+    centroid3 = calculate_centroid(perimeter3)
+    
+    ax.plot(centroid1[0], centroid1[1], 'ro', label='Centroid 3D BAG Mesh')
+    ax.plot(centroid2[0], centroid2[1], 'bo', label='Centroid GLB Mesh')
+    ax.plot(centroid3[0], centroid3[1], 'go', label='Centroid Non-aligned')
+
+    # Compute and display orientations
+    # orientation1 = compute_orientation(perimeter1)
+    orientation2 = compute_orientation(perimeter2)
+    orientation3 = compute_orientation(perimeter3)
+
+    # ax.text(centroid1[0], centroid1[1], f'{orientation1:.1f}°', color='red', fontsize=12, ha='right')
+    ax.text(centroid2[0], centroid2[1], f'{orientation2:.1f}°', color='blue', fontsize=12, ha='right')
+    ax.text(centroid3[0], centroid3[1], f'{orientation3:.1f}°', color='green', fontsize=12, ha='right')
+
+    # Plot north direction arrow (adjust the coordinates as needed)
+    ax.arrow(centroid1[0], centroid1[1], 0, 1, head_width=0.1, head_length=0.4, fc='k', ec='k', label='North')
+
+    # Plot orientation lines from centroid to the direction given by orientation angle
+    def plot_orientation_line(centroid, orientation, color):
+        length = 1.0  # Length of the orientation line
+        end_x = centroid[0] + length * np.cos(np.radians(orientation))
+        end_y = centroid[1] + length * np.sin(np.radians(orientation))
+        ax.plot([centroid[0], end_x], [centroid[1], end_y], color=color, linestyle='--')
+
+    # plot_orientation_line(centroid1, orientation1, 'red')
+    plot_orientation_line(centroid2, orientation2, 'blue')
+    plot_orientation_line(centroid3, orientation3, 'green')
+
+    # Adjust legend position to be outside the plot
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1), borderaxespad=0.)
+
+    ax.set_title('2D Perimeters, Centroids, Orientations, and Longest Edges')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_aspect('equal', adjustable='box')
+    plt.tight_layout(rect=[0, 0, 0.75, 1])  # Adjust layout to make room for the legend
     plt.show()
 
 def align_mesh_centers(mesh1, mesh2):
@@ -309,22 +355,13 @@ def extract_latlon_orientation_from_json(feature):
         logging.error("No vertices found in the feature data.")
         return None, None, None
 
+
 def compute_orientation(vertices):
-    """Compute the orientation of the building based on the convex hull's longest edge."""
-    hull = ConvexHull(vertices)
-    hull_vertices = vertices[hull.vertices]
-    
-    max_length = 0
-    orientation_angle = 0
-    for i in range(len(hull_vertices)):
-        for j in range(i + 1, len(hull_vertices)):
-            vec = hull_vertices[j] - hull_vertices[i]
-            length = np.linalg.norm(vec)
-            if length > max_length:
-                max_length = length
-                orientation_angle = np.arctan2(vec[1], vec[0])
-    
-    return np.degrees(orientation_angle)
+    pca = PCA(n_components=2)
+    pca.fit(vertices)
+    orientation_angle = np.degrees(np.arctan2(pca.components_[0, 1], pca.components_[0, 0]))
+    return orientation_angle
+
 
 def extract_latlon_orientation_from_mesh(mesh, reference_system):
     """Extract longitude, latitude, and orientation from mesh vertices."""
@@ -338,14 +375,14 @@ def extract_latlon_orientation_from_mesh(mesh, reference_system):
     latlon_vertices = np.array([transformer.transform(x, y) for x, y, z in vertices])
 
     # Compute orientation based on the convex hull's longest edge
-    orientation = compute_orientation(latlon_vertices)
+    orientation_angle = compute_orientation(latlon_vertices)
 
-    # Extract the lattitude, and longitude from the center of the mesh
+    # Extract the latitude and longitude from the center of the mesh
     lon, lat = np.mean(latlon_vertices, axis=0)
 
-
-    logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Orientation: {orientation:.5f} degrees")
-    return lon, lat, orientation
+    # Log the results
+    logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Orientation: {orientation_angle:.5f} degrees")
+    return lon, lat, orientation_angle
 
 def transform_coordinates(lat, lon, reference_system):
     """Transform coordinates to EPSG:7415 if they are not already in that reference system."""
@@ -377,13 +414,17 @@ def main():
 
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]
+    # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # model.glb
+    # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
+    feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
 
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/" 
-        glb_dataset = "model.glb"
+        # glb_dataset = "model.glb"
+        # glb_dataset = "pijlkruid37-37.glb"
+        glb_dataset = "rietstraat31-33.glb"
         glb_model_path = data_folder + glb_dataset
 
 
@@ -434,7 +475,7 @@ def main():
     # Visualize the 2D perimeters after applying the optimal rotation and translation
     rotated_perimeter2 = rotate(Polygon(perimeter2), optimal_angle, origin='centroid')
     translated_rotated_perimeter2 = np.array(rotated_perimeter2.exterior.coords) + [optimal_tx, optimal_ty]
-    visualize_2d_perimeters(perimeter1, translated_rotated_perimeter2)
+    visualize_2d_perimeters(perimeter1, translated_rotated_perimeter2, perimeter2)
 
     # Print the error after optimization
     error = calculate_intersection_error(optimal_params, perimeter1, perimeter2)

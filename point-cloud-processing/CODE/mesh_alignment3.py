@@ -383,7 +383,7 @@ def main():
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/" 
-        glb_dataset = "pijlkruid37-37.glb"
+        glb_dataset = "rietstraat31-33.glb"
         glb_model_path = data_folder + glb_dataset
 
 
