@@ -111,7 +111,7 @@ def visualize_glb_and_combined_meshes(mesh1, mesh2):
     mesh2 = mesh2.simplify_quadric_decimation(1000) #1000 is the number of vertices after simplification
     vertices2 = np.asarray(mesh2.vertices)
     triangles2 = np.asarray(mesh2.triangles)
-    
+
     # Create the figure and 3D axes
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -119,7 +119,7 @@ def visualize_glb_and_combined_meshes(mesh1, mesh2):
 
     # Create a 3D surface plot using plot_trisurf with a colormap
     ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap='winter', edgecolor='k', alpha=0.5)
-    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap='summer', edgecolor='k', alpha=0.5)
+    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap='summer', edgecolor='k', alpha=0.5)  
     
     # Auto scale to the mesh size
     scale = np.concatenate((vertices1, vertices2)).flatten()
@@ -185,9 +185,8 @@ def calculate_centroid(perimeter):
     """Calculate the centroid of a given perimeter using Shapely."""
     polygon = Polygon(perimeter)
     centroid = polygon.centroid
+
     return np.array([centroid.x, centroid.y])
-
-
 
 
 def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
@@ -208,31 +207,45 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
 
     # Compute and display orientations
     # orientation1 = compute_orientation(perimeter1)
-    orientation2 = compute_orientation(perimeter2)
-    orientation3 = compute_orientation(perimeter3)
+    # Compute and display orientations
+    orientation1, longest_edge1 = compute_orientation(perimeter1)
+    orientation2, longest_edge2 = compute_orientation(perimeter2)
+    orientation3, longest_edge3 = compute_orientation(perimeter3)
 
     # ax.text(centroid1[0], centroid1[1], f'{orientation1:.1f}°', color='red', fontsize=12, ha='right')
     ax.text(centroid2[0], centroid2[1], f'{orientation2:.1f}°', color='blue', fontsize=12, ha='right')
-    ax.text(centroid3[0], centroid3[1], f'{orientation3:.1f}°', color='green', fontsize=12, ha='right')
+    # ax.text(centroid3[0], centroid3[1], f'{orientation3:.1f}°', color='green', fontsize=12, ha='right')
 
-    # Plot north direction arrow (adjust the coordinates as needed)
-    ax.arrow(centroid1[0], centroid1[1], 0, 1, head_width=0.1, head_length=0.4, fc='k', ec='k', label='North')
+    # Plot north and east direction arrow (adjust the coordinates as needed)
+    ax.plot([centroid2[0], centroid2[0]], [centroid2[1], centroid2[1] + 6], 'k--', linewidth= 0.5)
+    ax.plot([centroid2[0], centroid2[0] + 6], [centroid2[1], centroid2[1]], 'k--', linewidth= 0.5)
+
+
+
+
+    # Plot the longest edges
+    # if longest_edge1[0] is not None and longest_edge1[1] is not None:
+    #     ax.plot([longest_edge1[0][0], longest_edge1[1][0]], [longest_edge1[0][1], longest_edge1[1][1]], 'r--', linewidth=2, label='Longest Edge 3D BAG Mesh')
+    if longest_edge2[0] is not None and longest_edge2[1] is not None:
+        ax.plot([longest_edge2[0][0], longest_edge2[1][0]], [longest_edge2[0][1], longest_edge2[1][1]], 'b--', linewidth=1, label='Longest Edge GLB Mesh')
+    # if longest_edge3[0] is not None and longest_edge3[1] is not None:
+    #     ax.plot([longest_edge3[0][0], longest_edge3[1][0]], [longest_edge3[0][1], longest_edge3[1][1]], 'g--', linewidth=2, label='Longest Edge Non-optimized')
 
     # Plot orientation lines from centroid to the direction given by orientation angle
     def plot_orientation_line(centroid, orientation, color):
-        length = 1.0  # Length of the orientation line
+        length = 2.0  # Length of the orientation line
         end_x = centroid[0] + length * np.cos(np.radians(orientation))
         end_y = centroid[1] + length * np.sin(np.radians(orientation))
         ax.plot([centroid[0], end_x], [centroid[1], end_y], color=color, linestyle='--')
 
     # plot_orientation_line(centroid1, orientation1, 'red')
     plot_orientation_line(centroid2, orientation2, 'blue')
-    plot_orientation_line(centroid3, orientation3, 'green')
+    # plot_orientation_line(centroid3, orientation3, 'green')
 
     # Adjust legend position to be outside the plot
     ax.legend(loc='upper left', bbox_to_anchor=(1, 1), borderaxespad=0.)
 
-    ax.set_title('2D Perimeters, Centroids, Orientations, and Longest Edges')
+    ax.set_title('2D Perimeters, Centroids, Orientations, and Orientations')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_aspect('equal', adjustable='box')
@@ -340,8 +353,8 @@ def extract_latlon_orientation_from_json(feature):
             transformer = Transformer.from_crs(f"EPSG:{epsg_code}", "EPSG:4326", always_xy=True)
             latlon_vertices = [transformer.transform(x, y) for x, y, z in vertices]
 
-            # Compute orientation
-            orientation = compute_orientation(np.array(latlon_vertices))
+            # Compute orientation of the perimeter of the mesh
+            orientation = compute_orientation(latlon_vertices)
 
             # Extract first longitude and latitude as an example
             lat, lon = latlon_vertices[0]
@@ -356,12 +369,41 @@ def extract_latlon_orientation_from_json(feature):
         return None, None, None
 
 
-def compute_orientation(vertices):
-    pca = PCA(n_components=2)
-    pca.fit(vertices)
-    orientation_angle = np.degrees(np.arctan2(pca.components_[0, 1], pca.components_[0, 0]))
-    return orientation_angle
+# def compute_orientation(vertices):
+#     pca = PCA(n_components=2)
+#     pca.fit(vertices)
+    
+#     # Calculate the principal component
+#     principal_component = pca.components_[0]
+    
+#     # Calculate the angle relative to the y-axis
+#     orientation_angle = np.degrees(np.arctan2(principal_component[1], principal_component[0]))
+    
+#     # Convert angle to be in the range [0, 360) degrees
+#     # orientation_angle = (orientation_angle + 360) % 360
+    
+#     return orientation_angle
 
+def compute_orientation(vertices):
+    """Compute the orientation of the building based on the azimuth angle of the longest edge relative to the north."""
+    hull = ConvexHull(vertices)
+    hull_vertices = vertices[hull.vertices]
+    
+    max_length = 0
+    orientation_angle = 0
+    longest_edge = (None, None)
+    
+    for i in range(len(hull_vertices)):
+        for j in range(i + 1, len(hull_vertices)):
+            vec = hull_vertices[j] - hull_vertices[i]
+            length = np.linalg.norm(vec)
+            if length > max_length:
+                max_length = length
+                # Calculate the azimuth angle relative to the north (y-axis)
+                orientation_angle = (np.degrees(np.arctan2(vec[0], vec[1])) + 360) % 360
+                longest_edge = (hull_vertices[i], hull_vertices[j])
+    
+    return orientation_angle, longest_edge
 
 def extract_latlon_orientation_from_mesh(mesh, reference_system):
     """Extract longitude, latitude, and orientation from mesh vertices."""
@@ -375,7 +417,7 @@ def extract_latlon_orientation_from_mesh(mesh, reference_system):
     latlon_vertices = np.array([transformer.transform(x, y) for x, y, z in vertices])
 
     # Compute orientation based on the convex hull's longest edge
-    orientation_angle = compute_orientation(latlon_vertices)
+    orientation_angle, longest_edge = compute_orientation(vertices) # (latlon_vertices)
 
     # Extract the latitude and longitude from the center of the mesh
     lon, lat = np.mean(latlon_vertices, axis=0)
@@ -414,7 +456,7 @@ def main():
 
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # model.glb
+    # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # model.glb Pijlkruidstraat 11, 13 and 15
     # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
     feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
 
@@ -439,7 +481,7 @@ def main():
             # Optimize rotation and translation
             optimal_params = optimize_rotation_and_translation(perimeter1, perimeter2)
             optimal_angle, optimal_tx, optimal_ty = optimal_params
-            logging.info(f"Optimal Rotation Angle: {optimal_angle:.5f}, Translation: x= {optimal_tx:.5f}, y= {optimal_ty:.5f}")
+            logging.info(f"Optimal Rotation Angle: {optimal_angle:.5f}, Translation: x= {optimal_tx:.5f}, y= {optimal_ty:.5f} \n")
             
             # Apply the optimal rotation and translation to the GLB mesh
             glb_mesh.rotate(glb_mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle))), center=glb_mesh.get_center())
@@ -471,6 +513,13 @@ def main():
 
     # Visualize the combined mesh and transformed GLB mesh
     visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
+
+    # Visualize the combined mesh and transformed GLB mesh using Open3D
+    # Paint the GLB mesh with the winter colormap
+    glb_mesh.paint_uniform_color([0.1, 0.5, 0.9])
+    # Paint the combined mesh with summer colormap
+    combined_mesh.paint_uniform_color([0.9, 0.5, 0.1])
+    o3d.visualization.draw_geometries([combined_mesh, glb_mesh], window_name="3D BAG and GLB Meshes", width=800, height=600, left=50, top=50, point_show_normal=True, mesh_show_wireframe=True, mesh_show_back_face=True)
     
     # Visualize the 2D perimeters after applying the optimal rotation and translation
     rotated_perimeter2 = rotate(Polygon(perimeter2), optimal_angle, origin='centroid')
