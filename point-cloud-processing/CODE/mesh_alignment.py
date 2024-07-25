@@ -8,12 +8,7 @@ from scipy.spatial import ConvexHull
 from shapely.geometry import Polygon
 from shapely.affinity import rotate
 from scipy.optimize import minimize
-from sklearn.decomposition import PCA
 
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from mpl_toolkits.mplot3d import Axes3D
-
-import geopandas as gpd
 from pyproj import Transformer
 from geopy.geocoders import Nominatim
 import time
@@ -118,8 +113,8 @@ def visualize_glb_and_combined_meshes(mesh1, mesh2):
     # ax.scatter(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], c='k', marker='o', s=5, label='3D BAG Mesh Vertices')
 
     # Create a 3D surface plot using plot_trisurf with a colormap
-    ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap='winter', edgecolor='k', alpha=0.5)
-    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap='summer', edgecolor='k', alpha=0.5)  
+    ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap='turbo', edgecolor='k', alpha=0.5)
+    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap='turbo', edgecolor='k', alpha=0.5)  
     
     # Auto scale to the mesh size
     scale = np.concatenate((vertices1, vertices2)).flatten()
@@ -206,8 +201,6 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     ax.plot(centroid3[0], centroid3[1], 'go', label='Centroid Non-aligned')
 
     # Compute and display orientations
-    # orientation1 = compute_orientation(perimeter1)
-    # Compute and display orientations
     orientation1, longest_edge1 = compute_orientation(perimeter1)
     orientation2, longest_edge2 = compute_orientation(perimeter2)
     orientation3, longest_edge3 = compute_orientation(perimeter3)
@@ -219,10 +212,7 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     # Plot north and east direction arrow (adjust the coordinates as needed)
     ax.plot([centroid2[0], centroid2[0]], [centroid2[1], centroid2[1] + 6], 'k--', linewidth= 0.5)
     ax.plot([centroid2[0], centroid2[0] + 6], [centroid2[1], centroid2[1]], 'k--', linewidth= 0.5)
-
-
-
-
+ 
     # Plot the longest edges
     # if longest_edge1[0] is not None and longest_edge1[1] is not None:
     #     ax.plot([longest_edge1[0][0], longest_edge1[1][0]], [longest_edge1[0][1], longest_edge1[1][1]], 'r--', linewidth=2, label='Longest Edge 3D BAG Mesh')
@@ -241,11 +231,10 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     # plot_orientation_line(centroid1, orientation1, 'red')
     plot_orientation_line(centroid2, orientation2, 'blue')
     # plot_orientation_line(centroid3, orientation3, 'green')
-
     # Adjust legend position to be outside the plot
     ax.legend(loc='upper left', bbox_to_anchor=(1, 1), borderaxespad=0.)
 
-    ax.set_title('2D Perimeters, Centroids, Orientations, and Orientations')
+    ax.set_title('2D Perimeters')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_aspect('equal', adjustable='box')
@@ -259,7 +248,7 @@ def align_mesh_centers(mesh1, mesh2):
     translation = center1 - center2
     vertices = np.asarray(mesh2.vertices) + translation
     mesh2.vertices = o3d.utility.Vector3dVector(vertices)
-    return mesh2
+    return mesh2, translation  # Return the translation used for alignment
 
 def calculate_intersection_error(params, perimeter1, perimeter2):
     """Calculate the error between the intersections of two perimeters after rotating and translating one by given parameters."""
@@ -313,8 +302,8 @@ def optimize_rotation_and_translation(perimeter1, perimeter2, num_attempts=5):
         return None
 
 
-def calculate_transformation_matrix(initial_transformation, angle, translation):
-    """Calculate the transformation matrix for the initial transformation, rotation angle and translation."""
+def calculate_transformation_matrix(initial_transformation, angle, translation, center_translation):
+    """Calculate the transformation matrix for initial transformation, rotation angle, translation, and centering."""
     cos_theta = np.cos(np.radians(angle))
     sin_theta = np.sin(np.radians(angle))
     rotation_matrix = np.array([
@@ -322,67 +311,21 @@ def calculate_transformation_matrix(initial_transformation, angle, translation):
         [sin_theta, cos_theta, 0],
         [0, 0, 1]
     ])
+    
+    # Create the translation matrix
     translation_matrix = np.eye(4)
     translation_matrix[:3, 3] = translation
 
-    # Combine all transformations into a single matrix
-    transformation_matrix = np.eye(4)
-    transformation_matrix[:3, :3] = initial_transformation
-    transformation_matrix = np.dot(translation_matrix, transformation_matrix)
-    transformation_matrix[:3, :3] = np.dot(rotation_matrix, transformation_matrix[:3, :3])
+    # Create the initial transformation matrix
+    initial_transformation_matrix = np.eye(4)
+    initial_transformation_matrix[:3, :3] = initial_transformation
 
-    return transformation_matrix
-
-def extract_latlon_orientation_from_json(feature):
-    """Extract longitude, latitude, and orientation from feature JSON data."""
-    if 'vertices' in feature['feature']:
-        vertices = np.array(feature['feature']['vertices'])
-        if 'transform' in feature['metadata'] and 'referenceSystem' in feature['metadata']['metadata']:
-            transform = feature['metadata']['transform']
-            scale = np.array(transform['scale'])
-            translate = np.array(transform['translate'])
-            
-            # Apply transformation
-            vertices = vertices * scale + translate
-
-            # Extract reference system
-            reference_system = feature['metadata']['metadata']['referenceSystem']
-            epsg_code = reference_system.split('/')[-1]
-            
-            # Convert to latitude and longitude
-            transformer = Transformer.from_crs(f"EPSG:{epsg_code}", "EPSG:4326", always_xy=True)
-            latlon_vertices = [transformer.transform(x, y) for x, y, z in vertices]
-
-            # Compute orientation of the perimeter of the mesh
-            orientation = compute_orientation(latlon_vertices)
-
-            # Extract first longitude and latitude as an example
-            lat, lon = latlon_vertices[0]
-
-            logging.info(f"Latitude: {lat}, Longitude: {lon}, , Orientation: {orientation} degrees")
-            return lat, lon, orientation
-        else:
-            logging.error("Transformation or reference system data missing in the feature.")
-            return None, None, None
-    else:
-        logging.error("No vertices found in the feature data.")
-        return None, None, None
-
-
-# def compute_orientation(vertices):
-#     pca = PCA(n_components=2)
-#     pca.fit(vertices)
+    # Combine the transformations
+    combined_transformation = np.eye(4)
+    combined_transformation[:3, :3] = rotation_matrix @ initial_transformation_matrix[:3, :3]
+    combined_transformation[:3, 3] = translation_matrix[:3, 3] + center_translation
     
-#     # Calculate the principal component
-#     principal_component = pca.components_[0]
-    
-#     # Calculate the angle relative to the y-axis
-#     orientation_angle = np.degrees(np.arctan2(principal_component[1], principal_component[0]))
-    
-#     # Convert angle to be in the range [0, 360) degrees
-#     # orientation_angle = (orientation_angle + 360) % 360
-    
-#     return orientation_angle
+    return combined_transformation
 
 def compute_orientation(vertices):
     """Compute the orientation of the building based on the azimuth angle of the longest edge relative to the north."""
@@ -400,7 +343,7 @@ def compute_orientation(vertices):
             if length > max_length:
                 max_length = length
                 # Calculate the azimuth angle relative to the north (y-axis)
-                orientation_angle = (np.degrees(np.arctan2(vec[0], vec[1])) + 360) % 360
+                orientation_angle = (np.degrees(np.arctan2(vec[1], vec[0])) + 360) % 360
                 longest_edge = (hull_vertices[i], hull_vertices[j])
     
     return orientation_angle, longest_edge
@@ -417,7 +360,7 @@ def extract_latlon_orientation_from_mesh(mesh, reference_system):
     latlon_vertices = np.array([transformer.transform(x, y) for x, y, z in vertices])
 
     # Compute orientation based on the convex hull's longest edge
-    orientation_angle, longest_edge = compute_orientation(vertices) # (latlon_vertices)
+    orientation_angle, longest_edge = compute_orientation(latlon_vertices) # (latlon_vertices)
 
     # Extract the latitude and longitude from the center of the mesh
     lon, lat = np.mean(latlon_vertices, axis=0)
@@ -454,91 +397,80 @@ def get_geo_location(lat, lon, reference_system):
 def main():
     start_time = time.time()
 
+    # Define API and dataset parameters
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # model.glb Pijlkruidstraat 11, 13 and 15
-    # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
-    feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
+    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]  # model.glb Pijlkruidstraat 11, 13 and 15
+    # Uncomment for different datasets:
+    # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"]  # pijlkruid37-37.glb
+    # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"]  # rietstraat31-33.glb
 
+    # Process the feature list
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
-        data_folder = "DATA/" 
-        # glb_dataset = "model.glb"
+        data_folder = "DATA/"
+        glb_dataset = "model.glb"
+        # Uncomment for different GLB models:
         # glb_dataset = "pijlkruid37-37.glb"
-        glb_dataset = "rietstraat31-33.glb"
+        # glb_dataset = "rietstraat31-33.glb"
         glb_model_path = data_folder + glb_dataset
 
-
+        # Load and transform the GLB model
         glb_mesh = load_and_transform_glb_model(glb_model_path, translate)
         
         if glb_mesh:
-            # Align the center of the GLB mesh with the feature mesh
-            glb_mesh = align_mesh_centers(combined_mesh, glb_mesh)
+            # Align the GLB mesh with the combined mesh
+            glb_mesh, center_translation = align_mesh_centers(combined_mesh, glb_mesh)
+            
+            # Extract 2D perimeters for optimization
             perimeter1 = extract_2d_perimeter(combined_mesh)
             perimeter2 = extract_2d_perimeter(glb_mesh)
             
             # Optimize rotation and translation
             optimal_params = optimize_rotation_and_translation(perimeter1, perimeter2)
-            optimal_angle, optimal_tx, optimal_ty = optimal_params
-            logging.info(f"Optimal Rotation Angle: {optimal_angle:.5f}, Translation: x= {optimal_tx:.5f}, y= {optimal_ty:.5f} \n")
-            
-            # Apply the optimal rotation and translation to the GLB mesh
-            glb_mesh.rotate(glb_mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle))), center=glb_mesh.get_center())
-            vertices = np.asarray(glb_mesh.vertices)
-            vertices[:, :2] += [optimal_tx, optimal_ty]
-            glb_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+            if optimal_params is not None:
+                optimal_angle, optimal_tx, optimal_ty = optimal_params
+                
+                # Apply optimal rotation and translation
+                glb_mesh.rotate(glb_mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle))), center=glb_mesh.get_center())
+                vertices = np.asarray(glb_mesh.vertices)
+                vertices[:, :2] += [optimal_tx, optimal_ty]
+                glb_mesh.vertices = o3d.utility.Vector3dVector(vertices)
 
-            # Extract latitude, longitude, and orientation from the transformed GLB mesh vertices
-            lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
-            
-            # Get the geo location using Nominatim
-            get_geo_location(lat, lon, reference_system)
-            
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print("\n")
-    logging.info(f"Elapsed time: {elapsed_time:.3f} seconds")
+                # Extract and log geographic data
+                lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
+                get_geo_location(lat, lon, reference_system)
 
-    # Calculate and print the transformation matrix: the initial transformation matrix is a reflection of the x-axis and remapping of y to z
-    initial_transformation = np.array([
-        [-1, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0]
-    ])
-    transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate + np.array([optimal_tx, optimal_ty, 0]))
-    logging.info(f"Transformation Matrix:\n{transformation_matrix}")
-    # Save the transformation matrix to a text file in the Results folder
-    np.savetxt("RESULTS/transformation_matrix.txt", transformation_matrix)
+                # Calculate and save the transformation matrix
+                initial_transformation = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
+                transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate, center_translation)
+                np.savetxt("RESULTS/transformation_matrix.txt", transformation_matrix)
+                print(transformation_matrix)
+                
+                # Save latitude, longitude, and orientation
+                with open("RESULTS/lat_lon_orientation.txt", "w") as file:
+                    file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
 
-    # Visualize the combined mesh and transformed GLB mesh
-    visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
+                # Visualize meshes and perimeters
+                visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
+                glb_mesh.paint_uniform_color([0.1, 0.5, 0.9])
+                combined_mesh.paint_uniform_color([0.9, 0.5, 0.1])
+                o3d.visualization.draw_geometries([combined_mesh, glb_mesh], window_name="3D BAG and GLB Meshes", width=800, height=600, left=50, top=50, point_show_normal=True, mesh_show_wireframe=True, mesh_show_back_face=True)
 
-    # Visualize the combined mesh and transformed GLB mesh using Open3D
-    # Paint the GLB mesh with the winter colormap
-    glb_mesh.paint_uniform_color([0.1, 0.5, 0.9])
-    # Paint the combined mesh with summer colormap
-    combined_mesh.paint_uniform_color([0.9, 0.5, 0.1])
-    o3d.visualization.draw_geometries([combined_mesh, glb_mesh], window_name="3D BAG and GLB Meshes", width=800, height=600, left=50, top=50, point_show_normal=True, mesh_show_wireframe=True, mesh_show_back_face=True)
-    
-    # Visualize the 2D perimeters after applying the optimal rotation and translation
-    rotated_perimeter2 = rotate(Polygon(perimeter2), optimal_angle, origin='centroid')
-    translated_rotated_perimeter2 = np.array(rotated_perimeter2.exterior.coords) + [optimal_tx, optimal_ty]
-    visualize_2d_perimeters(perimeter1, translated_rotated_perimeter2, perimeter2)
+                # Visualize 2D perimeters
+                rotated_perimeter2 = rotate(Polygon(perimeter2), optimal_angle, origin='centroid')
+                translated_rotated_perimeter2 = np.array(rotated_perimeter2.exterior.coords) + [optimal_tx, optimal_ty]
+                visualize_2d_perimeters(perimeter1, translated_rotated_perimeter2, perimeter2)
 
-    # Print the error after optimization
-    error = calculate_intersection_error(optimal_params, perimeter1, perimeter2)
-    logging.info(f"Intersection Error after optimization: {error:.5f} ")
+                # Print error after optimization
+                error = calculate_intersection_error(optimal_params, perimeter1, perimeter2)
+                logging.info(f"Intersection Error after optimization: {error:.5f}")
 
-    # Save the latitute, longitude, and orientation to a text file in the Results folder
-    with open("RESULTS/lat_lon_orientation.txt", "w") as file:
-        file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f} degrees")
-
-
-    # Save optimized GLB mesh to a file with colors
-    # o3d.io.write_triangle_mesh("RESULTS/optimized_model.glb", glb_mesh)
-
+    logging.info(f"Elapsed time: {time.time() - start_time:.3f} seconds")
 
 if __name__ == "__main__":
     main()
+
+
 
