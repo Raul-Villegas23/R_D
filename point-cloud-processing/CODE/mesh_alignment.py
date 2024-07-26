@@ -113,8 +113,8 @@ def visualize_glb_and_combined_meshes(mesh1, mesh2):
     # ax.scatter(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], c='k', marker='o', s=5, label='3D BAG Mesh Vertices')
 
     # Create a 3D surface plot using plot_trisurf with a colormap
-    ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap='turbo', edgecolor='k', alpha=0.5)
-    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap='turbo', edgecolor='k', alpha=0.5)  
+    ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap='plasma', edgecolor='k', alpha=0.5)
+    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap='plasma', edgecolor='k', alpha=0.5)  
     
     # Auto scale to the mesh size
     scale = np.concatenate((vertices1, vertices2)).flatten()
@@ -428,6 +428,16 @@ def get_geo_location(lat, lon, reference_system):
     else:
         logging.error("Unable to retrieve location information.")
         return None
+# Function to apply height-based coloring to a mesh
+def color_mesh_by_height(mesh):
+    vertices = np.asarray(mesh.vertices)
+    heights = vertices[:, 2]
+    min_height = np.min(heights)
+    max_height = np.max(heights)
+    normalized_heights = (heights - min_height) / (max_height - min_height)
+    colors = plt.get_cmap('plasma')(normalized_heights)[:, :3]
+    mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
+    return mesh
 
 def main():
     start_time = time.time()
@@ -456,7 +466,6 @@ def main():
         if not glb_mesh.has_vertices() or not glb_mesh.has_triangles():
             logging.error("The GLB model has no vertices or triangles.")
             return
-     
         # Transform the GLB model with Z offset
         glb_mesh = load_and_transform_glb_model(glb_model_path, translate)
 
@@ -505,11 +514,13 @@ def main():
                 with open("RESULTS/lat_lon_orientation.txt", "w") as file:
                     file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
 
-                # Visualize meshes and perimeters
+                # Visualize meshes and perimeters with Matplotlib before and after optimization
                 visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
-                glb_mesh.paint_uniform_color([0.1, 0.5, 0.9])
-                combined_mesh.paint_uniform_color([0.9, 0.5, 0.1])
-                o3d.visualization.draw_geometries([combined_mesh, glb_mesh], window_name="3D BAG and GLB Meshes", width=800, height=600, left=50, top=50, point_show_normal=True, mesh_show_wireframe=True, mesh_show_back_face=True)
+
+                # Apply height-based coloring
+                glb_mesh = color_mesh_by_height(glb_mesh)
+                combined_mesh = color_mesh_by_height(combined_mesh)
+                o3d.visualization.draw_geometries([combined_mesh, glb_mesh], window_name="3D BAG and GLB Meshes", width=800, height=600, left=50, top=50, point_show_normal=False, mesh_show_wireframe=False, mesh_show_back_face=True)
 
                 # Visualize 2D perimeters
                 rotated_perimeter2 = rotate(Polygon(perimeter2), optimal_angle, origin='centroid')
