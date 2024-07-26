@@ -34,13 +34,13 @@ def fetch_json(url):
 
 def create_mesh_from_feature(feature, feature_id):
     """Create and save a mesh object from feature data."""
+    # Check for the presence of vertices and apply transformation if available
     if 'vertices' in feature['feature']:
         vertices = np.array(feature['feature']['vertices'])
         if 'transform' in feature['metadata']:
             transform = feature['metadata']['transform']
             scale = np.array(transform['scale'])
             translate = np.array(transform['translate'])
-            
             vertices = vertices * scale + translate  # Apply transformation
         else:
             logging.error("Transformation data missing in the feature.")
@@ -51,6 +51,7 @@ def create_mesh_from_feature(feature, feature_id):
         city_object = feature['feature']['CityObjects'][feature_id]
         if 'attributes' in city_object:
             attributes = city_object['attributes']
+            # Ensure only LoD2.2 height attributes are used
             heights['b3_h_dak_50p'] = attributes.get('b3_h_dak_50p', 0)
             heights['b3_h_dak_70p'] = attributes.get('b3_h_dak_70p', 0)
             heights['b3_h_dak_max'] = attributes.get('b3_h_dak_max', 0)
@@ -60,23 +61,27 @@ def create_mesh_from_feature(feature, feature_id):
         # Create a mesh
         mesh = o3d.geometry.TriangleMesh()
         mesh.vertices = o3d.utility.Vector3dVector(vertices)
+        mesh.triangles = o3d.utility.Vector3iVector([])  # Initialize with empty triangles
 
-        # If 'boundaries' data exists and is properly formatted
+        # Process geometry to extract LoD2.2 boundaries
         if 'geometry' in city_object:
             for geom in city_object['geometry']:
-                if 'boundaries' in geom:
+                if 'boundaries' in geom and geom['lod'] == '2.2':
                     for shell in geom['boundaries']:
                         for surface in shell:
                             # Assuming all boundaries are triangulated or simple polygons
+                            triangles = []
                             for i in range(1, len(surface) - 1):
-                                mesh.triangles.append([surface[0], surface[i], surface[i + 1]])
-        
+                                triangles.append([surface[0], surface[i], surface[i + 1]])
+                            mesh.triangles.extend(triangles)
+
         mesh.triangles = o3d.utility.Vector3iVector(mesh.triangles)
         logging.info(f"Created mesh with {len(vertices)} vertices and {len(mesh.triangles)} triangles.")
         return mesh, scale, translate, heights
     else:
         logging.error("No vertices found in the feature data.")
         return None, None, None, None
+
 
 
 def process_feature_list(collections_url, collection_id, feature_ids):
@@ -108,74 +113,73 @@ def process_feature_list(collections_url, collection_id, feature_ids):
         for m in meshes:
             combined_mesh += m
         
-        visualize_combined_mesh(meshes, heights_list)
+        # Visualize combined mesh with the correct heights for LoD2.2
+        visualize_combined_mesh(combined_mesh, heights_list)
         return combined_mesh, scale, translate, reference_system, heights_list
     else:
         logging.error("No meshes to visualize.")
         return None, None, None, None
 
-def visualize_combined_mesh(meshes, heights_list):
+def visualize_combined_mesh(mesh, heights_list):
     """Visualize the combined mesh using Matplotlib."""
-    all_vertices = []
-    all_triangles = []
+    vertices = np.asarray(mesh.vertices)
+    triangles = np.asarray(mesh.triangles)
+    heights = heights_list[0]  # Assuming heights are the same for all features
 
-    for idx, mesh in enumerate(meshes):
-        vertices = np.asarray(mesh.vertices)
-        heights = heights_list[idx]
+    ground_height = heights.get('b3_h_maaiveld', 0)
+    roof_height = heights.get('b3_h_dak_50p', 0)  # Using 50th percentile roof height for LoD2.2
+    
+    num_base_vertices = len(vertices)
+    new_vertices = []
 
-        ground_height = heights.get('b3_h_maaiveld', 0)
-        roof_height = heights.get('b3_h_dak_70p', 0)  # Using the 70th percentile roof height for LoD1.2 and LoD1.3
+    for v in vertices:
+        new_vertices.append([v[0], v[1], ground_height])
+        new_vertices.append([v[0], v[1], roof_height])
+
+    new_vertices = np.array(new_vertices)
+    new_triangles = []
+
+    for i in range(num_base_vertices):
+        next_i = (i + 1) % num_base_vertices
+        base_idx = i * 2
+        top_idx = i * 2 + 1
+        next_base_idx = next_i * 2
+        next_top_idx = next_i * 2 + 1
         
-        new_vertices = []
-        new_triangles = []
-        
-        num_base_vertices = len(vertices)
+        new_triangles.append([base_idx, next_base_idx, top_idx])
+        new_triangles.append([top_idx, next_base_idx, next_top_idx])
 
-        # Add vertices for the ground and roof polygons
-        for v in vertices:
-            new_vertices.append([v[0], v[1], ground_height])
-            new_vertices.append([v[0], v[1], roof_height])
-        
-        # Create triangles for the vertical faces
-        for i in range(num_base_vertices):
-            new_triangles.append([i * 2, (i * 2 + 2) % (num_base_vertices * 2), i * 2 + 1])
-            new_triangles.append([i * 2 + 1, (i * 2 + 2) % (num_base_vertices * 2), (i * 2 + 3) % (num_base_vertices * 2)])
+    top_face = [i * 2 + 1 for i in range(num_base_vertices)]
+    bottom_face = [i * 2 for i in range(num_base_vertices)]
+    
+    new_triangles.extend(triangulate_face(top_face))
+    new_triangles.extend(triangulate_face(bottom_face))
 
-        # Create the top face
-        top_face = [i * 2 + 1 for i in range(num_base_vertices)]
-        new_triangles.extend(triangulate_face(top_face))
+    new_triangles = np.array(new_triangles)
 
-        # Create the bottom face
-        bottom_face = [i * 2 for i in range(num_base_vertices)]
-        new_triangles.extend(triangulate_face(bottom_face))
-        
-        new_vertices = np.array(new_vertices)
-        new_triangles = np.array(new_triangles) + len(all_vertices)
-        
-        all_vertices.extend(new_vertices)
-        all_triangles.extend(new_triangles)
-
-    all_vertices = np.array(all_vertices)
-    all_triangles = np.array(all_triangles)
+    # Ensure the triangles use indices within the bounds of the new vertices array
+    if new_triangles.max() >= len(new_vertices):
+        logging.error("Index out of bounds in new_triangles.")
+        return
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
     # Create a Poly3DCollection from the triangles
-    mesh_collection = Poly3DCollection(all_vertices[all_triangles], alpha=0.5, edgecolor='k')
+    mesh_collection = Poly3DCollection(new_vertices[new_triangles], alpha=0.5, edgecolor='k')
     ax.add_collection3d(mesh_collection)
 
     # Auto scale to the mesh size
-    scale = all_vertices.flatten()
+    scale = new_vertices.flatten()
     ax.auto_scale_xyz(scale, scale, scale)
 
     # Figure name
-    ax.set_title('3D BAG Combined Mesh with Heights')
+    ax.set_title('3D BAG Combined Mesh for LoD2.2')
 
     # Set axis limits based on the range of vertices
-    xlim = (all_vertices[:, 0].min(), all_vertices[:, 0].max())
-    ylim = (all_vertices[:, 1].min(), all_vertices[:, 1].max())
-    zlim = (all_vertices[:, 2].min(), all_vertices[:, 2].max())
+    xlim = (new_vertices[:, 0].min(), new_vertices[:, 0].max())
+    ylim = (new_vertices[:, 1].min(), new_vertices[:, 1].max())
+    zlim = (new_vertices[:, 2].min(), new_vertices[:, 2].max())
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.set_zlim(zlim)
@@ -265,10 +269,28 @@ def visualize_glb_and_combined_meshes_with_heights_o3d(mesh1, mesh2, heights_lis
     # Visualize using Open3D
     o3d.visualization.draw_geometries([combined_mesh_o3d, glb_mesh_o3d])
 
+def compute_z_offset(combined_mesh, glb_mesh):
+    """
+    Compute the Z offset needed to align the floor of the GLB mesh with the combined mesh.
+    """
+    combined_bbox = combined_mesh.get_axis_aligned_bounding_box()
+    glb_bbox = glb_mesh.get_axis_aligned_bounding_box()
+    
+    lowest_z_combined = combined_bbox.min_bound[2]
+    lowest_z_glb = glb_bbox.min_bound[2]
+    
+    print(f"Lowest Z in Combined Mesh Bounding Box: {lowest_z_combined}")
+    print(f"Lowest Z in GLB Mesh Bounding Box: {lowest_z_glb}")
+    
+    z_offset = lowest_z_combined - lowest_z_glb
+    
+    return z_offset
 
-
-
-
+def apply_z_offset(mesh, z_offset):
+    """
+    Apply the Z offset to the mesh.
+    """
+    mesh.translate((0, 0, z_offset))
 
 def load_and_transform_glb_model(file_path, translate):
     """Load a GLB model, remap y to z, apply translation, and reflect the x-axis."""
@@ -378,7 +400,7 @@ def align_mesh_centers(mesh1, mesh2):
     translation = center1 - center2
     vertices = np.asarray(mesh2.vertices) + translation
     mesh2.vertices = o3d.utility.Vector3dVector(vertices)
-    return mesh2
+    return mesh2, translation  # Return the translation used for alignment
 
 def calculate_intersection_error(params, perimeter1, perimeter2):
     """Calculate the error between the intersections of two perimeters after rotating and translating one by given parameters."""
@@ -432,8 +454,17 @@ def optimize_rotation_and_translation(perimeter1, perimeter2, num_attempts=5):
         return None
 
 
-def calculate_transformation_matrix(initial_transformation, angle, translation):
-    """Calculate the transformation matrix for the initial transformation, rotation angle and translation."""
+def calculate_transformation_matrix(initial_transformation, angle, translation, center_translation, z_offset):
+    """
+    Calculate the transformation matrix for initial transformation, rotation angle, translation, centering, and Z offset.
+    
+    :param initial_transformation: The initial transformation matrix (3x3) to apply.
+    :param angle: The rotation angle in degrees.
+    :param translation: The translation vector (x, y, z).
+    :param center_translation: Additional center translation (x, y, z).
+    :param z_offset: The Z offset to apply.
+    :return: The final transformation matrix (4x4).
+    """
     cos_theta = np.cos(np.radians(angle))
     sin_theta = np.sin(np.radians(angle))
     rotation_matrix = np.array([
@@ -441,31 +472,25 @@ def calculate_transformation_matrix(initial_transformation, angle, translation):
         [sin_theta, cos_theta, 0],
         [0, 0, 1]
     ])
+    
+    # Create the translation matrix
     translation_matrix = np.eye(4)
     translation_matrix[:3, 3] = translation
 
-    # Combine all transformations into a single matrix
-    transformation_matrix = np.eye(4)
-    transformation_matrix[:3, :3] = initial_transformation
-    transformation_matrix = np.dot(translation_matrix, transformation_matrix)
-    transformation_matrix[:3, :3] = np.dot(rotation_matrix, transformation_matrix[:3, :3])
+    # Create the initial transformation matrix
+    initial_transformation_matrix = np.eye(4)
+    initial_transformation_matrix[:3, :3] = initial_transformation
 
-    return transformation_matrix
+    # Combine the transformations
+    combined_transformation = np.eye(4)
+    combined_transformation[:3, :3] = rotation_matrix @ initial_transformation_matrix[:3, :3]
+    combined_transformation[:3, 3] = translation_matrix[:3, 3] + center_translation
+    
+    # Add Z offset
+    combined_transformation[2, 3] += z_offset
+    
+    return combined_transformation
 
-# def compute_orientation(vertices):
-#     pca = PCA(n_components=2)
-#     pca.fit(vertices)
-    
-#     # Calculate the principal component
-#     principal_component = pca.components_[0]
-    
-#     # Calculate the angle relative to the y-axis
-#     orientation_angle = np.degrees(np.arctan2(principal_component[1], principal_component[0]))
-    
-#     # Convert angle to be in the range [0, 360) degrees
-#     # orientation_angle = (orientation_angle + 360) % 360
-    
-#     return orientation_angle
 
 def compute_orientation(vertices):
     """Compute the orientation of the building based on the azimuth angle of the longest edge relative to the north."""
@@ -538,7 +563,7 @@ def main():
 
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # model.glb Pijlkruidstraat 11, 13 and 15
+    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # pijlkruidstraat11-13-15.glb Pijlkruidstraat 11, 13 and 15
     # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
     # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
 
@@ -546,7 +571,7 @@ def main():
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/" 
-        glb_dataset = "model.glb"
+        glb_dataset = "pijlkruidstraat11-13-15.glb"
         # glb_dataset = "pijlkruid37-37.glb"
         # glb_dataset = "rietstraat31-33.glb"
         glb_model_path = data_folder + glb_dataset
@@ -556,7 +581,7 @@ def main():
         
         if glb_mesh:
             # Align the center of the GLB mesh with the feature mesh
-            glb_mesh = align_mesh_centers(combined_mesh, glb_mesh)
+            glb_mesh, center_translation = align_mesh_centers(combined_mesh, glb_mesh)
             perimeter1 = extract_2d_perimeter(combined_mesh)
             perimeter2 = extract_2d_perimeter(glb_mesh)
             
@@ -570,6 +595,13 @@ def main():
             vertices = np.asarray(glb_mesh.vertices)
             vertices[:, :2] += [optimal_tx, optimal_ty]
             glb_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+            try:
+                z_offset = compute_z_offset(combined_mesh, glb_mesh)
+                print(f"Calculated Z offset: {z_offset}")  # Print the Z offset
+                apply_z_offset(glb_mesh, z_offset)
+            except ValueError as e:
+                print(f"Error computing Z-offset: {e}")
+                return
 
             # Extract latitude, longitude, and orientation from the transformed GLB mesh vertices
             lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
@@ -588,7 +620,7 @@ def main():
         [0, 0, 1],
         [0, 1, 0]
     ])
-    transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate + np.array([optimal_tx, optimal_ty, 0]))
+    transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate, center_translation, z_offset)
     logging.info(f"Transformation Matrix:\n{transformation_matrix}")
     # Save the transformation matrix to a text file in the Results folder
     np.savetxt("RESULTS/transformation_matrix.txt", transformation_matrix)

@@ -80,6 +80,29 @@ def load_and_transform_glb_model(file_path, translate):
     mesh.compute_vertex_normals()
     return mesh
 
+def compute_z_offset(combined_mesh, glb_mesh):
+    """
+    Compute the Z offset needed to align the floor of the GLB mesh with the combined mesh.
+    """
+    combined_bbox = combined_mesh.get_axis_aligned_bounding_box()
+    glb_bbox = glb_mesh.get_axis_aligned_bounding_box()
+    
+    lowest_z_combined = combined_bbox.min_bound[2]
+    lowest_z_glb = glb_bbox.min_bound[2]
+    
+    print(f"Lowest Z in Combined Mesh Bounding Box: {lowest_z_combined}")
+    print(f"Lowest Z in GLB Mesh Bounding Box: {lowest_z_glb}")
+    
+    z_offset = lowest_z_combined - lowest_z_glb
+    
+    return z_offset
+
+def apply_z_offset(mesh, z_offset):
+    """
+    Apply the Z offset to the mesh.
+    """
+    mesh.translate((0, 0, z_offset))
+
 def extract_2d_perimeter(mesh):
     """Extract the 2D perimeter of the mesh by projecting onto the xy-plane and computing the convex hull."""
     vertices = np.asarray(mesh.vertices)[:, :2]
@@ -132,8 +155,17 @@ def align_mesh_centers(mesh1, mesh2):
     mesh2.vertices = o3d.utility.Vector3dVector(vertices)
     return mesh2, translation  # Return the translation used for alignment
 
-def calculate_transformation_matrix(initial_transformation, angle, translation, center_translation):
-    """Calculate the transformation matrix for initial transformation, rotation angle, translation, and centering."""
+def calculate_transformation_matrix(initial_transformation, angle, translation, center_translation, z_offset):
+    """
+    Calculate the transformation matrix for initial transformation, rotation angle, translation, centering, and Z offset.
+    
+    :param initial_transformation: The initial transformation matrix (3x3) to apply.
+    :param angle: The rotation angle in degrees.
+    :param translation: The translation vector (x, y, z).
+    :param center_translation: Additional center translation (x, y, z).
+    :param z_offset: The Z offset to apply.
+    :return: The final transformation matrix (4x4).
+    """
     cos_theta = np.cos(np.radians(angle))
     sin_theta = np.sin(np.radians(angle))
     rotation_matrix = np.array([
@@ -155,6 +187,9 @@ def calculate_transformation_matrix(initial_transformation, angle, translation, 
     combined_transformation[:3, :3] = rotation_matrix @ initial_transformation_matrix[:3, :3]
     combined_transformation[:3, 3] = translation_matrix[:3, 3] + center_translation
     
+    # Add Z offset
+    combined_transformation[2, 3] += z_offset
+    
     return combined_transformation
 
 def main():
@@ -162,7 +197,7 @@ def main():
 
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # model.glb Pijlkruidstraat 11, 13 and 15
+    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # pijlkruidstraat11-13-15.glb Pijlkruidstraat 11, 13 and 15
     # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
     # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
 
@@ -170,7 +205,7 @@ def main():
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/" 
-        glb_dataset = "model.glb"
+        glb_dataset = "pijlkruidstraat11-13-15.glb"
         # glb_dataset = "pijlkruid37-37.glb"
         # glb_dataset = "rietstraat31-33.glb"
 
@@ -187,13 +222,26 @@ def main():
                 vertices[:, :2] += [optimal_tx, optimal_ty]
                 glb_mesh.vertices = o3d.utility.Vector3dVector(vertices)
 
+                # Apply optimal rotation and translation
+                glb_mesh.rotate(glb_mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle))), center=glb_mesh.get_center())
+                vertices = np.asarray(glb_mesh.vertices)
+                vertices[:, :2] += [optimal_tx, optimal_ty]
+                glb_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+                try:
+                    z_offset = compute_z_offset(combined_mesh, glb_mesh)
+                    print(f"Calculated Z offset: {z_offset}")  # Print the Z offset
+                    apply_z_offset(glb_mesh, z_offset)
+                except ValueError as e:
+                    print(f"Error computing Z-offset: {e}")
+                    return
+                
                 lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
                 logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Orientation: {orientation:.5f} degrees")
 
                 initial_transformation = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
-                # Compute the center offset (center_translation already reflects the alignment of mesh2 to mesh1)
-                transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate, center_translation)
-                np.savetxt("RESULTS/transformation_matrix.txt", transformation_matrix)
+                transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate, center_translation, z_offset)
+                print(f"Transformation Matrix:\n{transformation_matrix}")
+                np.savetxt("RESULTS/transformation_matrix_1.txt", transformation_matrix)
                 with open("RESULTS/lat_lon_orientation.txt", "w") as file:
                     file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
 
