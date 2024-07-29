@@ -5,4 +5,4 @@
 /FIGURES
 /requirements(original).txt
 /myenv.yml
-/CODE/_pycache_
+__pycache__/
