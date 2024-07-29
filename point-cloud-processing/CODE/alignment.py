@@ -13,13 +13,17 @@ import time
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def fetch_json(url):
-    """Fetch JSON data from a specified URL."""
-    response = requests.get(url)
-    if response.status_code == 200:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
         return response.json()
-    else:
-        logging.error(f"Failed to retrieve data: {response.status_code}")
-        return None
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"HTTP error occurred: {http_err} - Status code: {response.status_code}")
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"Request error occurred: {req_err}")
+    except Exception as err:
+        logging.error(f"An unexpected error occurred: {err}")
+    return None
 
 def create_mesh_from_feature(feature):
     """Create a mesh object from feature data."""
@@ -89,10 +93,6 @@ def compute_z_offset(combined_mesh, glb_mesh):
     
     lowest_z_combined = combined_bbox.min_bound[2]
     lowest_z_glb = glb_bbox.min_bound[2]
-    
-    print(f"Lowest Z in Combined Mesh Bounding Box: {lowest_z_combined}")
-    print(f"Lowest Z in GLB Mesh Bounding Box: {lowest_z_glb}")
-    
     z_offset = lowest_z_combined - lowest_z_glb
     
     return z_offset
@@ -156,16 +156,7 @@ def align_mesh_centers(mesh1, mesh2):
     return mesh2, translation  # Return the translation used for alignment
 
 def calculate_transformation_matrix(initial_transformation, angle, translation, center_translation, z_offset):
-    """
-    Calculate the transformation matrix for initial transformation, rotation angle, translation, centering, and Z offset.
-    
-    :param initial_transformation: The initial transformation matrix (3x3) to apply.
-    :param angle: The rotation angle in degrees.
-    :param translation: The translation vector (x, y, z).
-    :param center_translation: Additional center translation (x, y, z).
-    :param z_offset: The Z offset to apply.
-    :return: The final transformation matrix (4x4).
-    """
+    """ Calculate the transformation matrix to align the GLB model with the combined mesh."""
     cos_theta = np.cos(np.radians(angle))
     sin_theta = np.sin(np.radians(angle))
     rotation_matrix = np.array([

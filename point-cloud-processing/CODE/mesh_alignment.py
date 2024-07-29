@@ -17,14 +17,17 @@ import time
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def fetch_json(url):
-    """Fetch JSON data from a specified URL."""
-    with requests.Session() as session:
-        response = session.get(url)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logging.error(f"Failed to retrieve data: {response.status_code}")
-            return None
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"HTTP error occurred: {http_err} - Status code: {response.status_code}")
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"Request error occurred: {req_err}")
+    except Exception as err:
+        logging.error(f"An unexpected error occurred: {err}")
+    return None
 
 def create_mesh_from_feature(feature, feature_id):
     """Create and save a mesh object from feature data."""
@@ -325,16 +328,7 @@ def optimize_rotation_and_translation(perimeter1, perimeter2, num_attempts=5):
 
 
 def calculate_transformation_matrix(initial_transformation, angle, translation, center_translation, z_offset):
-    """
-    Calculate the transformation matrix for initial transformation, rotation angle, translation, centering, and Z offset.
-    
-    :param initial_transformation: The initial transformation matrix (3x3) to apply.
-    :param angle: The rotation angle in degrees.
-    :param translation: The translation vector (x, y, z).
-    :param center_translation: Additional center translation (x, y, z).
-    :param z_offset: The Z offset to apply.
-    :return: The final transformation matrix (4x4).
-    """
+    """Calculate the transformation matrix based on the given parameters."""
     cos_theta = np.cos(np.radians(angle))
     sin_theta = np.sin(np.radians(angle))
     rotation_matrix = np.array([
@@ -363,7 +357,7 @@ def calculate_transformation_matrix(initial_transformation, angle, translation, 
 
 
 def compute_orientation(vertices):
-    """Compute the orientation of the building based on the azimuth angle of the longest edge relative to the north."""
+    # Compute the orientation of the building based on the longest edge of the convex hull
     hull = ConvexHull(vertices)
     hull_vertices = vertices[hull.vertices]
     
@@ -377,7 +371,6 @@ def compute_orientation(vertices):
             length = np.linalg.norm(vec)
             if length > max_length:
                 max_length = length
-                # Calculate the azimuth angle relative to the north (y-axis)
                 orientation_angle = (np.degrees(np.arctan2(vec[1], vec[0])) + 360) % 360
                 longest_edge = (hull_vertices[i], hull_vertices[j])
     
@@ -428,6 +421,7 @@ def get_geo_location(lat, lon, reference_system):
     else:
         logging.error("Unable to retrieve location information.")
         return None
+    
 # Function to apply height-based coloring to a mesh
 def color_mesh_by_height(mesh):
     vertices = np.asarray(mesh.vertices)
@@ -441,24 +435,23 @@ def color_mesh_by_height(mesh):
 
 def main():
     start_time = time.time()
-
     # Define API and dataset parameters
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]  # model.glb Pijlkruidstraat 11, 13 and 15
+    # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]  # model.glb Pijlkruidstraat 11, 13 and 15
     # Uncomment for different datasets:
     # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"]  # pijlkruid37-37.glb
-    # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"]  # rietstraat31-33.glb
+    feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"]  # rietstraat31-33.glb
 
     # Process the feature list
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/"
-        glb_dataset = "pijlkruidstraat11-13-15.glb"
+        # glb_dataset = "pijlkruidstraat11-13-15.glb"
         # Uncomment for different GLB models:
         # glb_dataset = "pijlkruid37-37.glb"
-        # glb_dataset = "rietstraat31-33.glb"
+        glb_dataset = "rietstraat31-33.glb"
         glb_model_path = data_folder + glb_dataset
 
         # Load the GLB model
