@@ -1,54 +1,18 @@
-import requests
-import numpy as np
-import open3d as o3d
 import logging
-from scipy.spatial import ConvexHull
-from scipy.optimize import minimize
+import time
+import numpy as np
+from fetcher import fetch_json
+from mesh_processor import create_mesh_from_feature, load_and_transform_glb_model, align_mesh_centers
+from geometry_utils import extract_2d_perimeter, extract_latlon_orientation_from_mesh, calculate_intersection_error
+from transformation import optimize_rotation_and_translation, compute_z_offset, apply_z_offset, calculate_transformation_matrix
+from visualization import visualize_glb_and_combined_meshes, visualize_2d_perimeters, color_mesh_by_height
+import open3d as o3d
+from icp_alignment import refine_alignment_with_icp
 from shapely.geometry import Polygon
 from shapely.affinity import rotate
-from pyproj import Transformer
-import time
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-def fetch_json(url):
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.HTTPError as http_err:
-        logging.error(f"HTTP error occurred: {http_err} - Status code: {response.status_code}")
-    except requests.exceptions.RequestException as req_err:
-        logging.error(f"Request error occurred: {req_err}")
-    except Exception as err:
-        logging.error(f"An unexpected error occurred: {err}")
-    return None
-
-def create_mesh_from_feature(feature):
-    """Create a mesh object from feature data."""
-    if 'vertices' in feature['feature']:
-        vertices = np.array(feature['feature']['vertices'])
-        transform = feature['metadata'].get('transform', {})
-        scale = np.array(transform.get('scale', [1, 1, 1]))
-        translate = np.array(transform.get('translate', [0, 0, 0]))
-        vertices = vertices * scale + translate
-
-        mesh = o3d.geometry.TriangleMesh()
-        mesh.vertices = o3d.utility.Vector3dVector(vertices)
-
-        city_objects = feature['feature'].get('CityObjects', {})
-        for obj in city_objects.values():
-            for geom in obj.get('geometry', []):
-                for boundary in geom.get('boundaries', []):
-                    for i in range(1, len(boundary[0]) - 1):
-                        mesh.triangles.append([boundary[0][0], boundary[0][i], boundary[0][i + 1]])
-
-        mesh.triangles = o3d.utility.Vector3iVector(mesh.triangles)
-        return mesh, scale, translate
-    else:
-        logging.error("No vertices found in the feature data.")
-        return None, None, None
 
 def process_feature_list(collections_url, collection_id, feature_ids):
     """Process a list of feature IDs and combine their meshes."""
@@ -70,135 +34,23 @@ def process_feature_list(collections_url, collection_id, feature_ids):
         logging.error("No meshes to visualize.")
         return None, None, None, None
 
-def load_and_transform_glb_model(file_path, translate):
-    """Load and transform a GLB model."""
-    mesh = o3d.io.read_triangle_mesh(file_path)
-    if not mesh.has_vertices() or not mesh.has_triangles():
-        logging.error("The GLB model has no vertices or triangles.")
-        return None
-
-    vertices = np.asarray(mesh.vertices)
-    transformation_matrix = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
-    vertices = np.dot(vertices, transformation_matrix.T) + translate
-    mesh.vertices = o3d.utility.Vector3dVector(vertices)
-    mesh.compute_vertex_normals()
-    return mesh
-
-def compute_z_offset(combined_mesh, glb_mesh):
-    """
-    Compute the Z offset needed to align the floor of the GLB mesh with the combined mesh.
-    """
-    combined_bbox = combined_mesh.get_axis_aligned_bounding_box()
-    glb_bbox = glb_mesh.get_axis_aligned_bounding_box()
-    
-    lowest_z_combined = combined_bbox.min_bound[2]
-    lowest_z_glb = glb_bbox.min_bound[2]
-    z_offset = lowest_z_combined - lowest_z_glb
-    
-    return z_offset
-
-def apply_z_offset(mesh, z_offset):
-    """
-    Apply the Z offset to the mesh.
-    """
-    mesh.translate((0, 0, z_offset))
-
-def extract_2d_perimeter(mesh):
-    """Extract the 2D perimeter of the mesh by projecting onto the xy-plane and computing the convex hull."""
-    vertices = np.asarray(mesh.vertices)[:, :2]
-    hull = ConvexHull(vertices)
-    perimeter_points = vertices[hull.vertices]
-    return np.vstack([perimeter_points, perimeter_points[0]])
-
-def calculate_intersection_error(params, perimeter1, perimeter2):
-    """Calculate the error between intersections of two perimeters after rotating and translating one."""
-    angle, tx, ty = params
-    rotated_perimeter2 = rotate(Polygon(perimeter2), angle, origin='centroid')
-    translated_perimeter2 = np.array(rotated_perimeter2.exterior.coords) + [tx, ty]
-    poly1, poly2 = Polygon(perimeter1), Polygon(translated_perimeter2)
-    intersection = poly1.intersection(poly2)
-    union = poly1.union(poly2)
-    return 1 - (intersection.area / union.area) if union.area != 0 else 0
-
-def optimize_rotation_and_translation(perimeter1, perimeter2):
-    """Optimize rotation angle and translation to align two perimeters."""
-    initial_guesses = [[-45.0, 0.0, 0.0], [45.0, 0.0, 0.0], [90.0, 0.0, 0.0], [-90.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-    bounds = [(-180, 180), (-np.inf, np.inf), (-np.inf, np.inf)]
-    best_result, lowest_error = None, float('inf')
-
-    for initial_guess in initial_guesses:
-        result = minimize(calculate_intersection_error, initial_guess, args=(perimeter1, perimeter2), method='L-BFGS-B', bounds=bounds)
-        if result.success and result.fun < lowest_error:
-            best_result, lowest_error = result, result.fun
-
-    return best_result.x if best_result else None
-
-def extract_latlon_orientation_from_mesh(mesh, reference_system):
-    """Extract longitude, latitude, and orientation from mesh vertices."""
-    vertices = np.asarray(mesh.vertices)
-    epsg_code = reference_system.split('/')[-1]
-    transformer = Transformer.from_crs(f"EPSG:{epsg_code}", "EPSG:4326", always_xy=True)
-    latlon_vertices = np.array([transformer.transform(x, y) for x, y, z in vertices])
-    centroid = np.mean(latlon_vertices, axis=0)
-    hull = ConvexHull(latlon_vertices)
-    hull_vertices = latlon_vertices[hull.vertices]
-    longest_edge = max(((hull_vertices[i], hull_vertices[j]) for i in range(len(hull_vertices)) for j in range(i+1, len(hull_vertices))), key=lambda edge: np.linalg.norm(edge[1] - edge[0]))
-    orientation_angle = (np.degrees(np.arctan2(longest_edge[1][1] - longest_edge[0][1], longest_edge[1][0] - longest_edge[0][0])) + 360) % 360
-    return centroid[1], centroid[0], orientation_angle
-
-def align_mesh_centers(mesh1, mesh2):
-    """Align the center of mesh2 to mesh1."""
-    center1 = mesh1.get_center()
-    center2 = mesh2.get_center()
-    translation = center1 - center2
-    vertices = np.asarray(mesh2.vertices) + translation
-    mesh2.vertices = o3d.utility.Vector3dVector(vertices)
-    return mesh2, translation  # Return the translation used for alignment
-
-def calculate_transformation_matrix(initial_transformation, angle, translation, center_translation, z_offset):
-    """ Calculate the transformation matrix to align the GLB model with the combined mesh."""
-    cos_theta = np.cos(np.radians(angle))
-    sin_theta = np.sin(np.radians(angle))
-    rotation_matrix = np.array([
-        [cos_theta, -sin_theta, 0],
-        [sin_theta, cos_theta, 0],
-        [0, 0, 1]
-    ])
-    
-    # Create the translation matrix
-    translation_matrix = np.eye(4)
-    translation_matrix[:3, 3] = translation
-
-    # Create the initial transformation matrix
-    initial_transformation_matrix = np.eye(4)
-    initial_transformation_matrix[:3, :3] = initial_transformation
-
-    # Combine the transformations
-    combined_transformation = np.eye(4)
-    combined_transformation[:3, :3] = rotation_matrix @ initial_transformation_matrix[:3, :3]
-    combined_transformation[:3, 3] = translation_matrix[:3, 3] + center_translation
-    
-    # Add Z offset
-    combined_transformation[2, 3] += z_offset
-    
-    return combined_transformation
 
 def main():
     start_time = time.time()
 
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # pijlkruidstraat11-13-15.glb Pijlkruidstraat 11, 13 and 15
+    # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"] # pijlkruidstraat11-13-15.glb Pijlkruidstraat 11, 13 and 15
     # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
-    # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
+    feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
 
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/" 
-        glb_dataset = "pijlkruidstraat11-13-15.glb"
+        # glb_dataset = "pijlkruidstraat11-13-15.glb"
         # glb_dataset = "pijlkruid37-37.glb"
-        # glb_dataset = "rietstraat31-33.glb"
+        glb_dataset = "rietstraat31-33.glb"
 
         glb_model_path = data_folder + glb_dataset
         glb_mesh = load_and_transform_glb_model(glb_model_path, translate)
@@ -225,15 +77,25 @@ def main():
                 except ValueError as e:
                     print(f"Error computing Z-offset: {e}")
                     return
+                # Refine alignment with ICP
+                glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, combined_mesh)
+                logging.info(f"ICP Transformation Matrix:\n{icp_transformation}")
                 
                 lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
                 logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Orientation: {orientation:.5f} degrees")
 
+                # Calculate the final transformation matrix
                 initial_transformation = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
                 transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate, center_translation, z_offset)
-                print(f"Transformation Matrix:\n{transformation_matrix}")
-                np.savetxt("RESULTS/transformation_matrix_1.txt", transformation_matrix)
-                with open("RESULTS/lat_lon_orientation.txt", "w") as file:
+
+                # Combine the transformation matrices
+                final_transformation_matrix = icp_transformation @ transformation_matrix 
+                logging.info(f"Final Transformation Matrix:\n{final_transformation_matrix}")
+
+                # Save the final transformation matrix with the name of the GLB dataset
+                transformation_matrix_filename = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
+                np.savetxt(transformation_matrix_filename, final_transformation_matrix)
+                with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
                     file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
 
     logging.info(f"Elapsed time: {time.time() - start_time:.3f} seconds")

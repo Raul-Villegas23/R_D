@@ -39,16 +39,7 @@ def apply_z_offset(mesh, z_offset):
     mesh.translate((0, 0, z_offset))
 
 def calculate_transformation_matrix(initial_transformation, angle, translation, center_translation, z_offset):
-    """
-    Calculate the transformation matrix for initial transformation, rotation angle, translation, centering, and Z offset.
-    
-    :param initial_transformation: The initial transformation matrix (3x3) to apply.
-    :param angle: The rotation angle in degrees.
-    :param translation: The translation vector (x, y, z).
-    :param center_translation: Additional center translation (x, y, z).
-    :param z_offset: The Z offset to apply.
-    :return: The final transformation matrix (4x4).
-    """
+    """ Calculate the transformation matrix based on the given parameters. """
     cos_theta = np.cos(np.radians(angle))
     sin_theta = np.sin(np.radians(angle))
     rotation_matrix = np.array([

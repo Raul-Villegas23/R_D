@@ -190,15 +190,35 @@ def load_and_transform_glb_model(file_path, translate):
     return mesh
 
 
+
 def extract_2d_perimeter(mesh):
     """Extract the 2D perimeter of the mesh by projecting onto the xy-plane and computing the convex hull."""
-    vertices = np.asarray(mesh.vertices)[:, :2]  # Ignore z-values by taking only x and y
-    hull = ConvexHull(vertices)
-    perimeter_points = vertices[hull.vertices]
-
+    vertices = np.asarray(mesh.vertices)
+    
+    # Extract XY points at different heights
+    heights = np.unique(vertices[:, 2])
+    xy_points = []
+    
+    for height in heights:
+        points_at_height = vertices[vertices[:, 2] == height][:, :2]
+        xy_points.append(points_at_height)
+    
+    # Combine all XY points from different heights
+    all_xy_points = np.vstack(xy_points)
+    
+    # Remove duplicate points to prevent issues with ConvexHull
+    all_xy_points = np.unique(all_xy_points, axis=0)
+    
+    if len(all_xy_points) < 3:
+        raise ValueError("Not enough unique vertices to compute a convex hull.")
+    
+    # Compute the convex hull
+    hull = ConvexHull(all_xy_points)
+    perimeter_points = all_xy_points[hull.vertices]
+    
     # Close the loop by appending the first point to the end
     perimeter_points = np.vstack([perimeter_points, perimeter_points[0]])
-
+    
     return perimeter_points
 
 def calculate_centroid(perimeter):

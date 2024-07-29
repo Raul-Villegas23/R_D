@@ -35,7 +35,7 @@ def load_and_transform_glb_model(file_path, translate):
         return None
 
     vertices = np.asarray(mesh.vertices)
-    transformation_matrix = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
+    transformation_matrix = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]) # Transform the GLB model to the right-handed coordinate system
     vertices = np.dot(vertices, transformation_matrix.T) + translate
     mesh.vertices = o3d.utility.Vector3dVector(vertices)
     mesh.compute_vertex_normals()
