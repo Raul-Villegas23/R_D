@@ -33,7 +33,7 @@ def process_feature_list(collections_url, collection_id, feature_ids):
     else:
         logging.error("No meshes to visualize.")
         return None, None, None, None
-    
+
 def main():
     start_time = time.time()
 
@@ -43,7 +43,7 @@ def main():
     feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
     # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
-    
+
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/"
         # glb_dataset = "pijlkruidstraat11-13-15.glb"
@@ -52,12 +52,17 @@ def main():
         glb_model_path = data_folder + glb_dataset
         glb_mesh = load_and_transform_glb_model(glb_model_path, translate)
         if glb_mesh:
+            # Align the centers of the two meshes
             glb_mesh, center_translation = align_mesh_centers(combined_mesh, glb_mesh)
+
+            # Extract 2D perimeters from the combined and GLB meshes
             perimeter1, perimeter2 = extract_2d_perimeter(combined_mesh), extract_2d_perimeter(glb_mesh)
 
+            # Visualize the 3D and 2D meshes for comparison and alignment
             visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
             visualize_2d_perimeters(perimeter1, perimeter2, perimeter2)
 
+            # Optimize the rotation angle and translation to align the perimeters
             optimal_params = optimize_rotation_and_translation(perimeter1, perimeter2)
             if optimal_params is not None:
                 optimal_angle, optimal_tx, optimal_ty = optimal_params
@@ -74,6 +79,7 @@ def main():
                     print(f"Error computing Z-offset: {e}")
                     return
                 
+                # Refine the alignment using ICP and calculate the final transformation matrix
                 glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, combined_mesh)
                 logging.info(f"ICP Transformation Matrix:\n{icp_transformation}")
 
@@ -87,9 +93,13 @@ def main():
                 lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
                 logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Orientation: {orientation:.5f} degrees")
                 
-                initial_transformation = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
+                # Accumulate the transformations to get the final transformation matrix
+                initial_transformation = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]) # Transform the GLB model to the right-handed coordinate system
+                translation_matrix = np.eye(4)
+                translation_matrix[0, 3] = optimal_tx
+                translation_matrix[1, 3] = optimal_ty
                 transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate, center_translation, z_offset1)
-                final_transformation_matrix = icp_transformation @ transformation_matrix
+                final_transformation_matrix = icp_transformation @ translation_matrix @ transformation_matrix
                 logging.info(f"Final Transformation Matrix:\n{final_transformation_matrix}")
 
                 transformation_matrix_filename = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
