@@ -4,7 +4,6 @@ import numpy as np
 import open3d as o3d
 from fetcher import fetch_json
 from mesh_processor import create_mesh_from_feature, load_and_transform_glb_model
-from mesh_processor import create_mesh_from_feature, align_mesh_centers
 from visualization import visualize_glb_and_combined_meshes
 
 # Setup logging

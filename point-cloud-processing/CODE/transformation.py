@@ -65,3 +65,10 @@ def calculate_transformation_matrix(initial_transformation, angle, translation, 
     combined_transformation[2, 3] += z_offset
     
     return combined_transformation
+
+def accumulate_transformations(transformations):
+    """Accumulate a list of transformation matrices."""
+    final_transformation = np.eye(4)
+    for transform in transformations:
+        final_transformation = transform @ final_transformation
+    return final_transformation

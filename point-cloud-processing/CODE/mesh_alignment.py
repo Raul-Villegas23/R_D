@@ -8,10 +8,10 @@ from scipy.spatial import ConvexHull
 from shapely.geometry import Polygon
 from shapely.affinity import rotate
 from scipy.optimize import minimize
-
 from pyproj import Transformer
 from geopy.geocoders import Nominatim
 import time
+from icp_alignment import refine_alignment_with_icp
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -501,6 +501,7 @@ def main():
                 vertices = np.asarray(glb_mesh.vertices)
                 vertices[:, :2] += [optimal_tx, optimal_ty]
                 glb_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+
                 try:
                     z_offset = compute_z_offset(combined_mesh, glb_mesh)
                     print(f"Calculated Z offset: {z_offset}")  # Print the Z offset
@@ -509,9 +510,25 @@ def main():
                     print(f"Error computing Z-offset: {e}")
                     return
                 
+                # Refine alignment with ICP
+                glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, combined_mesh)
+                logging.info(f"ICP Transformation Matrix:\n{icp_transformation}")
+
+                try:
+                    z_offset = compute_z_offset(combined_mesh, glb_mesh)
+                    logging.info(f"Recalculated Z offset: {z_offset}")
+                    apply_z_offset(glb_mesh, z_offset)
+                    logging.info("Reapplied Z offset")
+                    
+                    # Update the transformation matrix with the z_offset
+                    z_offset_matrix = np.eye(4)
+                    z_offset_matrix[2, 3] = z_offset
+
+                except ValueError as e:
+                    logging.error(f"Error computing Z-offset: {e}")
+                    return
                 # Save the optimized GLB mesh as a .ply file with the name of the GLB dataset + .ply
                 # ply_filename = glb_dataset.replace('.glb', '.ply')
-                # o3d.io.write_triangle_mesh(f"RESULTS/{ply_filename}", glb_mesh)
 
                 # Extract and log geographic data
                 lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
@@ -520,6 +537,7 @@ def main():
                 # Calculate and save the transformation matrix
                 initial_transformation = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
                 transformation_matrix = calculate_transformation_matrix(initial_transformation, optimal_angle, translate, center_translation, z_offset)
+                transformation_matrix = transformation_matrix @ icp_transformation @ z_offset_matrix
                 print(transformation_matrix)
                 np.savetxt("RESULTS/transformation_matrix.txt", transformation_matrix)
                 
