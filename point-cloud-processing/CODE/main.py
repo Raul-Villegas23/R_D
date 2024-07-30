@@ -39,12 +39,16 @@ def main():
 
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
-    feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]
+    # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]  #  Pijlkruidstraat 11, 13 and 15
+    feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
+    # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
     
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/"
-        glb_dataset = "pijlkruidstraat11-13-15.glb"
+        # glb_dataset = "pijlkruidstraat11-13-15.glb"
+        glb_dataset = "pijlkruid37-37.glb"
+        # glb_dataset = "rietstraat31-33.glb"
         glb_model_path = data_folder + glb_dataset
         glb_mesh = load_and_transform_glb_model(glb_model_path, translate)
         if glb_mesh:
