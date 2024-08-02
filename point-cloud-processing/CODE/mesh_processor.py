@@ -32,14 +32,22 @@ def load_and_transform_glb_model(file_path, translate):
     mesh = o3d.io.read_triangle_mesh(file_path)
     if not mesh.has_vertices() or not mesh.has_triangles():
         logging.error("The GLB model has no vertices or triangles.")
-        return None
+        return None, None
 
     vertices = np.asarray(mesh.vertices)
-    transformation_matrix = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]) # Transform the GLB model to the right-handed coordinate system
+    # Transformation to convert the GLB model to the right-handed coordinate system
+    transformation_matrix = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
     vertices = np.dot(vertices, transformation_matrix.T) + translate
     mesh.vertices = o3d.utility.Vector3dVector(vertices)
     mesh.compute_vertex_normals()
-    return mesh
+    
+    # Create the initial transformation matrix as a homogeneous transformation
+    initial_transformation = np.eye(4)
+    initial_transformation[:3, :3] = transformation_matrix
+    initial_transformation[:3, 3] = translate
+    
+    return mesh, initial_transformation
+
 
 def align_mesh_centers(mesh1, mesh2):
     """Align the center of mesh2 to mesh1."""

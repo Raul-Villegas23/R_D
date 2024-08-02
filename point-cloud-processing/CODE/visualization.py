@@ -76,8 +76,8 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     # ax.text(centroid3[0], centroid3[1], f'{orientation3:.1f}°', color='green', fontsize=12, ha='right')
 
     # Plot north and east direction arrow (adjust the coordinates as needed)
-    ax.plot([centroid2[0], centroid2[0]], [centroid2[1], centroid2[1] + 6], 'k--', linewidth= 0.5)
-    ax.plot([centroid2[0], centroid2[0] + 6], [centroid2[1], centroid2[1]], 'k--', linewidth= 0.5)
+    # ax.plot([centroid2[0], centroid2[0]], [centroid2[1], centroid2[1] + 6], 'k--', linewidth= 0.5)
+    # ax.plot([centroid2[0], centroid2[0] + 6], [centroid2[1], centroid2[1]], 'k--', linewidth= 0.5)
  
     # Plot the longest edges
     # if longest_edge1[0] is not None and longest_edge1[1] is not None:
@@ -116,3 +116,28 @@ def color_mesh_by_height(mesh):
     colors = plt.get_cmap('plasma')(normalized_heights)[:, :3]
     mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
     return mesh
+
+def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh):
+    """
+    Color the meshes by height and visualize them using Open3D.
+
+    Parameters:
+    - combined_mesh (open3d.geometry.TriangleMesh): The combined mesh to be visualized.
+    - glb_mesh (open3d.geometry.TriangleMesh): The GLB mesh to be visualized.
+    """
+    # Color the meshes based on height
+    glb_mesh = color_mesh_by_height(glb_mesh)
+    combined_mesh = color_mesh_by_height(combined_mesh)
+
+    # Visualize the meshes using Open3D
+    o3d.visualization.draw_geometries(
+        [combined_mesh, glb_mesh],
+        window_name="3D BAG and GLB Meshes",
+        width=800,
+        height=600,
+        left=50,
+        top=50,
+        point_show_normal=False,
+        mesh_show_wireframe=False,
+        mesh_show_back_face=True
+    )
