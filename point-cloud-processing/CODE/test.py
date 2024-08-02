@@ -49,6 +49,72 @@ def load_optimal_params(file_path):
     """Load optimal parameters from a text file."""
     return np.loadtxt(file_path)
 
+def rotation_matrix(axis, angle, is_degree=True):
+    """Generate a rotation matrix given an axis and an angle."""
+    if is_degree:
+        angle = np.radians(angle)
+    c, s = np.cos(angle), np.sin(angle)
+    if axis == 'x':
+        return np.array([
+            [1, 0, 0],
+            [0, c, -s],
+            [0, s, c]
+        ])
+    elif axis == 'y':
+        return np.array([
+            [c, 0, s],
+            [0, 1, 0],
+            [-s, 0, c]
+        ])
+    elif axis == 'z':
+        return np.array([
+            [c, -s, 0],
+            [s, c, 0],
+            [0, 0, 1]
+        ])
+    else:
+        raise ValueError("Axis must be 'x', 'y', or 'z'")
+    
+def create_center_based_transformation_matrix(mesh, optimal_angle, optimal_tx, optimal_ty):
+    """Create a 4x4 transformation matrix with center-based rotation and translation."""
+    # Compute the center of the mesh
+    center = mesh.get_center()
+    
+    # Convert angle to radians
+    angle_rad = np.radians(optimal_angle)
+    
+    # Create a 3x3 rotation matrix for the Z-axis
+    rotation_mat = np.array([
+        [np.cos(angle_rad), -np.sin(angle_rad), 0],
+        [np.sin(angle_rad),  np.cos(angle_rad), 0],
+        [0,                  0,                 1]
+    ])
+    
+    # Translation to move the center to the origin
+    translation_to_origin = np.eye(4)
+    translation_to_origin[:3, 3] = -center
+    
+    # Translation to move the center back
+    translation_back = np.eye(4)
+    translation_back[:3, 3] = center
+
+    # Optimal translation matrix
+    optimal_translation_matrix = np.eye(4)
+    optimal_translation_matrix[0, 3] = optimal_tx
+    optimal_translation_matrix[1, 3] = optimal_ty
+
+    # Create a 4x4 homogeneous rotation matrix
+    rotation_matrix_4x4 = np.eye(4)
+    rotation_matrix_4x4[:3, :3] = rotation_mat
+    
+    # Combine the transformations: Translate to origin -> Rotate -> Translate back -> Optimal translation
+    combined_transformation_matrix = (
+        optimal_translation_matrix @ translation_back @ rotation_matrix_4x4 @ translation_to_origin
+    )
+    
+    return combined_transformation_matrix
+
+
 def main():
     start_time = time.time()
 
@@ -86,10 +152,18 @@ def main():
 
         # Apply the loaded transformation matrix
         transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix)
+        transformation_matrix = create_center_based_transformation_matrix(transformed_glb_mesh, optimal_angle, optimal_tx, optimal_ty)
+        print("Transformation Matrix 4x4:\n", transformation_matrix)
+        # Apply this transformation to the mesh
+        transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix)
 
-        # Apply the optimal transformation
-        transformed_glb_mesh = apply_optimal_params(transformed_glb_mesh, optimal_angle, optimal_tx, optimal_ty)
+        # Apply the optimal rotation
+        # rotation_mat = rotation_matrix('z', optimal_angle)
+        # print("Rotation Matrix 3x3:\n", rotation_mat)
 
+        # # Apply the rotation to the mesh
+        # transformed_glb_mesh.rotate(rotation_mat, center=transformed_glb_mesh.get_center())
+        
         # Visualize the results
         visualize_meshes_with_height_coloring(combined_mesh, transformed_glb_mesh)
 

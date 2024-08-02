@@ -3,7 +3,7 @@ import time
 import numpy as np
 import open3d as o3d
 from fetcher import fetch_json
-from mesh_processor import create_mesh_from_feature, load_and_transform_glb_model, align_mesh_centers, apply_optimal_params
+from mesh_processor import create_mesh_from_feature, load_and_transform_glb_model, align_mesh_centers, apply_optimal_params, create_center_based_transformation_matrix
 from geometry_utils import extract_2d_perimeter, extract_latlon_orientation_from_mesh, calculate_intersection_error
 from transformation import optimize_rotation_and_translation, compute_z_offset, apply_z_offset, accumulate_transformations
 from visualization import visualize_glb_and_combined_meshes, visualize_2d_perimeters, visualize_meshes_with_height_coloring
@@ -69,9 +69,14 @@ def main():
             if optimal_params is not None:
                 optimal_angle, optimal_tx, optimal_ty = optimal_params
                 print(f"Optimal Parameters: {optimal_params}")
+
                 # Save the optimal parameters for later use
                 np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_optimal_params.txt", [optimal_angle, optimal_tx, optimal_ty])
-                glb_mesh = apply_optimal_params(glb_mesh, optimal_angle, optimal_tx, optimal_ty)
+                glb_mesh= apply_optimal_params(glb_mesh, optimal_angle, optimal_tx, optimal_ty)
+                
+                # Append optimal rotation and translation to the transformations with created transformation matrix
+                transformation_matrix = create_center_based_transformation_matrix(glb_mesh, optimal_angle, optimal_tx, optimal_ty)
+                # transformations.append(transformation_matrix)
 
                 try:
                     z_offset1 = compute_z_offset(combined_mesh, glb_mesh)
@@ -108,7 +113,7 @@ def main():
 
                 # Accumulate the transformations to get the final transformation matrix
                 final_transformation_matrix = accumulate_transformations(transformations)
-                logging.info(f"Final Transformation Matrix:\n{final_transformation_matrix}")
+                logging.info(f"Transformation Matrix:\n{final_transformation_matrix}")
 
                 transformation_matrix_filename = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
                 np.savetxt(transformation_matrix_filename, final_transformation_matrix)
@@ -116,11 +121,11 @@ def main():
                     file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
 
                 visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
-                visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
+                # visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
 
                 rotated_perimeter2 = rotate(Polygon(perimeter2), optimal_angle, origin='centroid')
                 translated_rotated_perimeter2 = np.array(rotated_perimeter2.exterior.coords) + [optimal_tx, optimal_ty]
-                visualize_2d_perimeters(perimeter1, translated_rotated_perimeter2, perimeter2)
+                # visualize_2d_perimeters(perimeter1, translated_rotated_perimeter2, perimeter2)
 
                 error = calculate_intersection_error(optimal_params, perimeter1, perimeter2)
                 logging.info(f"Intersection Error after optimization: {error:.5f}")

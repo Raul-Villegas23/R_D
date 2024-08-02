@@ -48,5 +48,6 @@ def get_transformation_matrix(initial_mesh, final_mesh, threshold=1.0, max_itera
         o3d.pipelines.registration.TransformationEstimationPointToPoint(),
         o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iterations)
     )
+    print(reg_p2p)
 
     return reg_p2p.transformation
