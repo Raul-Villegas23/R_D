@@ -24,10 +24,7 @@ def compute_z_offset(combined_mesh, glb_mesh):
     
     lowest_z_combined = combined_bbox.min_bound[2]
     lowest_z_glb = glb_bbox.min_bound[2]
-    
-    print(f"Lowest Z in Combined Mesh Bounding Box: {lowest_z_combined}")
-    print(f"Lowest Z in GLB Mesh Bounding Box: {lowest_z_glb}")
-    
+
     z_offset = lowest_z_combined - lowest_z_glb
     
     return z_offset

@@ -3,8 +3,11 @@ import time
 import numpy as np
 import open3d as o3d
 from fetcher import fetch_json
-from mesh_processor import create_mesh_from_feature, load_and_transform_glb_model
-from visualization import visualize_glb_and_combined_meshes
+from mesh_processor import create_mesh_from_feature, load_and_transform_glb_model, align_mesh_centers, apply_optimal_params
+from geometry_utils import extract_2d_perimeter, extract_latlon_orientation_from_mesh, calculate_intersection_error
+from transformation import optimize_rotation_and_translation, compute_z_offset, apply_z_offset, accumulate_transformations
+from visualization import visualize_glb_and_combined_meshes, visualize_2d_perimeters, visualize_meshes_with_height_coloring
+from icp_alignment import refine_alignment_with_icp
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -41,28 +44,6 @@ def apply_transformation(mesh, transformation_matrix):
     mesh.compute_vertex_normals()
     return mesh
 
-def load_and_transform_glb_model(file_path, transformation_matrix):
-    """Load and transform a GLB model using the given transformation matrix."""
-    mesh = o3d.io.read_triangle_mesh(file_path)
-    if not mesh.has_vertices() or not mesh.has_triangles():
-        logging.error("The GLB model has no vertices or triangles.")
-        return None
-
-    mesh = apply_transformation(mesh, transformation_matrix)
-    return mesh
-
-def apply_optimal_params(mesh, optimal_angle, optimal_tx, optimal_ty):
-    """Apply the optimal rotation and translation to the mesh."""
-    # Apply optimal rotation
-    rotation_matrix = mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle)))
-    mesh.rotate(rotation_matrix, center=mesh.get_center())
-
-    # Apply optimal translation
-    vertices = np.asarray(mesh.vertices)
-    vertices[:, :2] += [optimal_tx, optimal_ty]
-    mesh.vertices = o3d.utility.Vector3dVector(vertices)
-
-    return mesh
 
 def load_optimal_params(file_path):
     """Load optimal parameters from a text file."""
@@ -74,16 +55,16 @@ def main():
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
     # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]  # Pijlkruidstraat 11, 13 and 15
-    feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
-    # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
+    # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
+    feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
 
     if combined_mesh:
         # Load GLB model and apply transformation
         data_folder = "DATA/"
         # glb_dataset = "pijlkruidstraat11-13-15.glb"
-        glb_dataset = "pijlkruid37-37.glb"
-        # glb_dataset = "rietstraat31-33.glb"
+        # glb_dataset = "pijlkruid37-37.glb"
+        glb_dataset = "rietstraat31-33.glb"
         
         # Load transformation matrix
         transformation_matrix_path = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
@@ -96,7 +77,6 @@ def main():
         optimal_angle, optimal_tx, optimal_ty = optimal_params
         logging.info(f"Loaded optimal parameters: angle={optimal_angle}, tx={optimal_tx}, ty={optimal_ty}")
 
-
         glb_model_path = data_folder + glb_dataset
         
         transformed_glb_mesh = o3d.io.read_triangle_mesh(glb_model_path)
@@ -108,14 +88,10 @@ def main():
         transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix)
 
         # Apply the optimal transformation
-        rotation_matrix = transformed_glb_mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle)))
-        transformed_glb_mesh.rotate(rotation_matrix, center=transformed_glb_mesh.get_center())
-        vertices = np.asarray(transformed_glb_mesh.vertices)
-        vertices[:, :2] += [optimal_tx, optimal_ty]
-        transformed_glb_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+        transformed_glb_mesh = apply_optimal_params(transformed_glb_mesh, optimal_angle, optimal_tx, optimal_ty)
 
         # Visualize the results
-        visualize_glb_and_combined_meshes(combined_mesh, transformed_glb_mesh)
+        visualize_meshes_with_height_coloring(combined_mesh, transformed_glb_mesh)
 
     logging.info(f"Elapsed time: {time.time() - start_time:.3f} seconds")
 

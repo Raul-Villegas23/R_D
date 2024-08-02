@@ -57,3 +57,16 @@ def align_mesh_centers(mesh1, mesh2):
     vertices = np.asarray(mesh2.vertices) + translation
     mesh2.vertices = o3d.utility.Vector3dVector(vertices)
     return mesh2, translation  # Return the translation used for alignment
+
+def apply_optimal_params(mesh, optimal_angle, optimal_tx, optimal_ty):
+    """Apply the optimal rotation and translation to the mesh."""
+    # Apply optimal rotation
+    rotation_matrix = mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle)))
+    mesh.rotate(rotation_matrix, center=mesh.get_center())
+
+    # Apply optimal translation
+    vertices = np.asarray(mesh.vertices)
+    vertices[:, :2] += [optimal_tx, optimal_ty]
+    mesh.vertices = o3d.utility.Vector3dVector(vertices)
+
+    return mesh
