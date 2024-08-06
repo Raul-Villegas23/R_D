@@ -2,6 +2,14 @@ import numpy as np
 import open3d as o3d
 import logging
 
+def apply_transformation(mesh, transformation_matrix):
+    """Apply transformation matrix to the mesh."""
+    vertices = np.asarray(mesh.vertices)
+    transformed_vertices = (transformation_matrix[:3, :3] @ vertices.T).T + transformation_matrix[:3, 3]
+    mesh.vertices = o3d.utility.Vector3dVector(transformed_vertices)
+    mesh.compute_vertex_normals()
+    return mesh
+
 def create_mesh_from_feature(feature):
     """Create a mesh object from feature data."""
     if 'vertices' in feature['feature']:
@@ -35,6 +43,7 @@ def load_and_transform_glb_model(file_path, translate):
         return None, None
 
     vertices = np.asarray(mesh.vertices)
+
     # Transformation to convert the GLB model to the right-handed coordinate system
     transformation_matrix = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
     vertices = np.dot(vertices, transformation_matrix.T) + translate
@@ -64,6 +73,8 @@ def apply_optimal_params(mesh, optimal_angle, optimal_tx, optimal_ty):
     rotation_matrix = mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle)))
     mesh.rotate(rotation_matrix, center=mesh.get_center())
     print(f"Rotation Matrix: {rotation_matrix}")
+    # Print center of the mesh
+    print(f"Center of the mesh: {mesh.get_center()}")
 
     # Apply optimal translation
     vertices = np.asarray(mesh.vertices)
@@ -77,42 +88,3 @@ def apply_optimal_params(mesh, optimal_angle, optimal_tx, optimal_ty):
     print(f"Transformation Matrix from Optimal parameters: {transformation_matrix}")
 
     return mesh
-
-def create_center_based_transformation_matrix(mesh, optimal_angle, optimal_tx, optimal_ty):
-    """Create a 4x4 transformation matrix with center-based rotation and translation."""
-    # Compute the center of the mesh
-    center = mesh.get_center()
-    
-    # Convert angle to radians
-    angle_rad = np.radians(optimal_angle)
-    
-    # Create a 3x3 rotation matrix for the Z-axis
-    rotation_mat = np.array([
-        [np.cos(angle_rad), -np.sin(angle_rad), 0],
-        [np.sin(angle_rad),  np.cos(angle_rad), 0],
-        [0,                  0,                 1]
-    ])
-    
-    # Translation to move the center to the origin
-    translation_to_origin = np.eye(4)
-    translation_to_origin[:3, 3] = -center
-    
-    # Translation to move the center back
-    translation_back = np.eye(4)
-    translation_back[:3, 3] = center
-
-    # Optimal translation matrix
-    optimal_translation_matrix = np.eye(4)
-    optimal_translation_matrix[0, 3] = optimal_tx
-    optimal_translation_matrix[1, 3] = optimal_ty
-
-    # Create a 4x4 homogeneous rotation matrix
-    rotation_matrix_4x4 = np.eye(4)
-    rotation_matrix_4x4[:3, :3] = rotation_mat
-    
-    # Combine the transformations: Translate to origin -> Rotate -> Translate back -> Optimal translation
-    combined_transformation_matrix = (
-        optimal_translation_matrix @ translation_back @ rotation_matrix_4x4 @ translation_to_origin
-    )
-    
-    return combined_transformation_matrix

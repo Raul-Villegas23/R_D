@@ -2,6 +2,8 @@ import numpy as np
 from scipy.optimize import minimize
 from geometry_utils import calculate_intersection_error
 
+
+
 def optimize_rotation_and_translation(perimeter1, perimeter2):
     """Optimize rotation angle and translation to align two perimeters."""
     initial_guesses = [[-45.0, 0.0, 0.0], [45.0, 0.0, 0.0], [90.0, 0.0, 0.0], [-90.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
@@ -69,3 +71,67 @@ def accumulate_transformations(transformations):
     for transform in transformations:
         final_transformation = transform @ final_transformation
     return final_transformation
+
+def create_center_based_transformation_matrix(mesh, optimal_angle, optimal_tx, optimal_ty):
+    """Create a 4x4 transformation matrix with center-based rotation and translation."""
+    # Compute the center of the mesh
+    center = mesh.get_center()
+    
+    # Convert angle to radians
+    angle_rad = np.radians(optimal_angle)
+    
+    # Create a 3x3 rotation matrix for the Z-axis
+    rotation_mat = np.array([
+        [np.cos(angle_rad), -np.sin(angle_rad), 0],
+        [np.sin(angle_rad),  np.cos(angle_rad), 0],
+        [0,                  0,                 1]
+    ])
+    
+    # Translation to move the center to the origin
+    translation_to_origin = np.eye(4)
+    translation_to_origin[:3, 3] = -center
+    
+    # Translation to move the center back
+    translation_back = np.eye(4)
+    translation_back[:3, 3] = center
+
+    # Optimal translation matrix
+    optimal_translation_matrix = np.eye(4)
+    optimal_translation_matrix[0, 3] = optimal_tx
+    optimal_translation_matrix[1, 3] = optimal_ty
+
+    # Create a 4x4 homogeneous rotation matrix
+    rotation_matrix_4x4 = np.eye(4)
+    rotation_matrix_4x4[:3, :3] = rotation_mat
+    
+    # Combine the transformations: Translate to origin -> Rotate -> Translate back -> Optimal translation
+    combined_transformation_matrix = (
+        optimal_translation_matrix @ translation_back @ rotation_matrix_4x4 @ translation_to_origin
+    )
+    
+    return combined_transformation_matrix
+
+def create_complete_transformation_matrix(optimal_angle, optimal_tx, optimal_ty):
+    # Create a 4x4 identity matrix
+    transformation_matrix = np.eye(4)
+
+    # Calculate rotation matrix around the Z-axis
+    cos_theta = np.cos(np.radians(optimal_angle))
+    sin_theta = np.sin(np.radians(optimal_angle))
+
+    rotation_matrix = np.array([
+        [cos_theta, -sin_theta, 0, 0],
+        [sin_theta, cos_theta, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ])
+
+    # Translation matrix
+    translation_matrix = np.eye(4)
+    translation_matrix[0, 3] = optimal_tx
+    translation_matrix[1, 3] = optimal_ty
+
+    # Combine rotation and translation matrices
+    transformation_matrix = rotation_matrix @ translation_matrix
+
+    return transformation_matrix
