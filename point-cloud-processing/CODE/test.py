@@ -12,7 +12,6 @@ from icp_alignment import refine_alignment_with_icp
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 def load_transformation_matrix(file_path):
     """Load transformation matrix from a text file."""
     return np.loadtxt(file_path)
@@ -21,7 +20,6 @@ def load_transformation_matrix(file_path):
 def load_optimal_params(file_path):
     """Load optimal parameters from a text file."""
     return np.loadtxt(file_path)
-
 
 
 def main():
