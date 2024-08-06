@@ -72,10 +72,7 @@ def apply_optimal_params(mesh, optimal_angle, optimal_tx, optimal_ty):
     # Apply optimal rotation
     rotation_matrix = mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle)))
     mesh.rotate(rotation_matrix, center=mesh.get_center())
-    print(f"Rotation Matrix: {rotation_matrix}")
-    # Print center of the mesh
-    print(f"Center of the mesh: {mesh.get_center()}")
-
+    
     # Apply optimal translation
     vertices = np.asarray(mesh.vertices)
     vertices[:, :2] += [optimal_tx, optimal_ty]
@@ -85,6 +82,5 @@ def apply_optimal_params(mesh, optimal_angle, optimal_tx, optimal_ty):
     transformation_matrix = np.eye(4)
     transformation_matrix[:3, :3] = rotation_matrix
     transformation_matrix[:3, 3] = [optimal_tx, optimal_ty, 0]
-    print(f"Transformation Matrix from Optimal parameters: {transformation_matrix}")
-
+    
     return mesh

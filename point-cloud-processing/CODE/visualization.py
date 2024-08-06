@@ -25,8 +25,8 @@ def visualize_glb_and_combined_meshes(mesh1, mesh2):
     # ax.scatter(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], c='k', marker='o', s=5, label='3D BAG Mesh Vertices')
 
     # Create a 3D surface plot using plot_trisurf with a colormap
-    ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap='plasma', edgecolor='k', alpha=0.5)
-    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap='plasma', edgecolor='k', alpha=0.5)  
+    ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap='viridis', edgecolor='k', alpha=0.5)
+    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap='viridis', edgecolor='k', alpha=0.5)  
     
     # Auto scale to the mesh size
     scale = np.concatenate((vertices1, vertices2)).flatten()

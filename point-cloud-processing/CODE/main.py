@@ -11,38 +11,39 @@ from icp_alignment import refine_alignment_with_icp
 from shapely.geometry import Polygon
 from shapely.affinity import rotate
 
-# Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 def main():
     start_time = time.time()
 
+    # Define the API URL and the collection ID and feature IDs to process
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
     # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]  # Pijlkruidstraat 11, 13 and 15
-    # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
-    feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
+    feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
+    # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
+
+    # Process the feature list and combine the meshes into a single mesh
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
 
     if combined_mesh and scale is not None and translate is not None and reference_system is not None:
         data_folder = "DATA/"
         # glb_dataset = "pijlkruidstraat11-13-15.glb"
-        # glb_dataset = "pijlkruid37-37.glb"
-        glb_dataset = "rietstraat31-33.glb"
+        glb_dataset = "pijlkruid37-37.glb"
+        # glb_dataset = "rietstraat31-33.glb"
         glb_model_path = data_folder + glb_dataset
 
         # Translate the GLB model to the right-handed coordinate system
         glb_mesh, initial_transformation = load_and_transform_glb_model(glb_model_path, translate)
 
         if glb_mesh:
+
             # Initialize transformations with the initial transformation matrix
             transformations = [initial_transformation]
 
             # Align the centers of the two meshes
             glb_mesh, center_translation = align_mesh_centers(combined_mesh, glb_mesh)
 
-            # Create a transformation matrix for center translation
+            # Create a transformation matrix based on the center translation
             center_translation_matrix = np.eye(4)
             center_translation_matrix[:3, 3] = center_translation
             transformations.append(center_translation_matrix) # Append the center translation matrix
@@ -50,12 +51,12 @@ def main():
             # Extract 2D perimeters from the combined and GLB meshes
             perimeter1, perimeter2 = extract_2d_perimeter(combined_mesh), extract_2d_perimeter(glb_mesh)
 
-            # Optimize the rotation angle and translation to align the perimeters
+            # Find the optimal rotation angle and translation to align the perimeters using the intersection error
             optimal_params = optimize_rotation_and_translation(perimeter1, perimeter2)
             if optimal_params is not None:
                 optimal_angle, optimal_tx, optimal_ty = optimal_params
-                logging.info(f"Optimal Parameters: {optimal_params}")
-
+                logging.info(f"Optimal Parameters: angle={optimal_angle}, tx={optimal_tx}, ty={optimal_ty}")
+                logging.info(f"Optimal Error: {calculate_intersection_error(optimal_params, perimeter1, perimeter2):.5f}")
                 # Save the optimal parameters for later use
                 np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_optimal_params.txt", [optimal_angle, optimal_tx, optimal_ty])
                 glb_mesh = apply_optimal_params(glb_mesh, optimal_angle, optimal_tx, optimal_ty)
@@ -76,7 +77,6 @@ def main():
 
                 # Refine the alignment using ICP and calculate the final transformation matrix
                 glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, combined_mesh)
-                logging.info(f"ICP Transformation Matrix:\n{icp_transformation}")
                 transformations.append(icp_transformation) # Append the ICP transformation matrix
 
                 try:
@@ -106,19 +106,17 @@ def main():
                 np.savetxt(transformation_matrix_filename, final_transformation_matrix)
                 with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
                     file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
+                
 
                 # Visualize the combined and GLB meshes with height coloring
                 visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
                 visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
 
                 # Visualize the 2D perimeters and the intersection
-                rotated_perimeter2 = rotate(Polygon(perimeter2), optimal_angle, origin='centroid')
-                translated_rotated_perimeter2 = np.array(rotated_perimeter2.exterior.coords) + [optimal_tx, optimal_ty]
-                visualize_2d_perimeters(perimeter1, translated_rotated_perimeter2, perimeter2)
+                perimeter3 = extract_2d_perimeter(glb_mesh) # Extract the 2D perimeter of the GLB mesh after alignment
+                visualize_2d_perimeters(perimeter1, perimeter3, perimeter2)
 
-                error = calculate_intersection_error(optimal_params, perimeter1, perimeter2)
-                logging.info(f"Intersection Error after optimization: {error:.5f}")
-
+                # Save the GLB mesh as a PLY file
                 ply_filename = glb_dataset.replace('.glb', '.ply')
                 o3d.io.write_triangle_mesh(f"RESULTS/{ply_filename}", glb_mesh)
 

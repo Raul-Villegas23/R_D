@@ -2,52 +2,42 @@ import open3d as o3d
 import copy
 import numpy as np
 
-def refine_alignment_with_icp(source_mesh, target_mesh, threshold=1.0, max_iterations=500):
-    """Refine alignment between source and target meshes using ICP."""
+def refine_alignment_with_icp(source_mesh, target_mesh, threshold=1.0, initial_max_iterations=50, max_iterations_limit=5000, convergence_threshold=1e-4):
+
     source = copy.deepcopy(source_mesh)
     target = copy.deepcopy(target_mesh)
-    
+
     # Convert meshes to point clouds for ICP
     source_point_cloud = source.sample_points_uniformly(number_of_points=10000)
     target_point_cloud = target.sample_points_uniformly(number_of_points=10000)
 
-    # Apply ICP directly without an initial transformation
-    reg_p2p = o3d.pipelines.registration.registration_icp(
-        source_point_cloud, target_point_cloud, threshold,
-        np.identity(4),
-        o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-        o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iterations)
-    )
+    # Initialize variables for dynamic iteration control
+    last_transformation = np.identity(4)
+    max_iterations = initial_max_iterations
 
-    # Apply the transformation to the source mesh
+    while max_iterations <= max_iterations_limit:
+        # Apply ICP with current max_iterations
+        reg_p2p = o3d.pipelines.registration.registration_icp(
+            source_point_cloud, target_point_cloud, threshold,
+            last_transformation,
+            o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+            o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iterations)
+        )
+
+        # Compute change in transformation matrix
+        transformation_change = np.linalg.norm(reg_p2p.transformation - last_transformation)
+
+        # Check for convergence
+        if transformation_change < convergence_threshold:
+            print(f"ICP converged with {max_iterations} iterations, change: {transformation_change:.6f}")
+            source.transform(reg_p2p.transformation)
+            print(reg_p2p)
+            return source, reg_p2p.transformation
+
+        # Update last transformation and increase max_iterations
+        last_transformation = reg_p2p.transformation
+        max_iterations += 50  # Increment iterations for next attempt
+
+    print(f"ICP reached maximum iteration limit of {max_iterations_limit} without full convergence.")
     source.transform(reg_p2p.transformation)
-
     return source, reg_p2p.transformation
-
-def get_transformation_matrix(initial_mesh, final_mesh, threshold=1.0, max_iterations=500):
-    """
-    Calculate the transformation matrix that aligns the initial mesh with the final aligned mesh.
-    
-    Parameters:
-    initial_mesh (o3d.geometry.TriangleMesh): The initial mesh before transformation.
-    final_mesh (o3d.geometry.TriangleMesh): The final aligned mesh after transformation.
-    threshold (float): Maximum distance threshold between corresponding points.
-    max_iterations (int): Maximum number of ICP iterations.
-
-    Returns:
-    np.ndarray: Transformation matrix (4x4) that aligns the initial mesh with the final mesh.
-    """
-    # Convert meshes to point clouds for alignment comparison
-    initial_point_cloud = initial_mesh.sample_points_uniformly(number_of_points=10000)
-    final_point_cloud = final_mesh.sample_points_uniformly(number_of_points=10000)
-
-    # Perform ICP registration to get the transformation matrix
-    reg_p2p = o3d.pipelines.registration.registration_icp(
-        initial_point_cloud, final_point_cloud, threshold,
-        np.identity(4),
-        o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-        o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iterations)
-    )
-    print(reg_p2p)
-
-    return reg_p2p.transformation
