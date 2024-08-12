@@ -9,3 +9,4 @@ __pycache__/
 # Ignore folder called experimental-analysis in a sibling directory
 ../experimental-analysis/
 # Ignore folder called experimental-analysis in a parent directory
+../../experimental-analysis/
