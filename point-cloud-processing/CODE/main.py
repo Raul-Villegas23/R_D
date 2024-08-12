@@ -118,13 +118,11 @@ def main():
 
 
                 # Visualize the combined and GLB meshes with height coloring
-                o3d.visualization.draw_geometries([glb_mesh])
-                visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
-                visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
+                # visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
 
                 # Visualize the 2D perimeters and the intersection
                 perimeter3 = extract_2d_perimeter(glb_mesh) # Extract the 2D perimeter of the GLB mesh after alignment
-                visualize_2d_perimeters(perimeter1, perimeter3, perimeter2)
+                # visualize_2d_perimeters(perimeter1, perimeter3, perimeter2)
 
                 # Save the GLB mesh as a PLY file
                 ply_filename = glb_dataset.replace('.glb', '.ply')
