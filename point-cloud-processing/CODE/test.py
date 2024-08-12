@@ -28,25 +28,25 @@ def main():
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
     # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]  # Pijlkruidstraat 11, 13 and 15
-    # feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
-    feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
+    feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
+    # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
     combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
 
     if combined_mesh:
         # Load GLB model and apply transformation
         data_folder = "DATA/"
         # glb_dataset = "pijlkruidstraat11-13-15.glb"
-        # glb_dataset = "pijlkruid37-37.glb"
-        glb_dataset = "rietstraat31-33.glb"
+        glb_dataset = "pijlkruid37-37.glb"
+        # glb_dataset = "rietstraat31-33.glb"
 
         # Initialize transformation matrix
         transformations = []
         
         # Load transformation matrix
         transformation_matrix_path = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
-        transformation_matrix = load_transformation_matrix(transformation_matrix_path)
-        logging.info(f"Loaded transformation matrix:\n{transformation_matrix}")
-        transformations.append(transformation_matrix)
+        transformation_matrix_1 = load_transformation_matrix(transformation_matrix_path) # Load transformation matrix from a text file
+        logging.info(f"Loaded transformation matrix:\n{transformation_matrix_1}")
+        transformations.append(transformation_matrix_1)
         
         # Load optimal parameters
         optimal_params_path = f"RESULTS/{glb_dataset.split('.')[0]}_optimal_params.txt"
@@ -62,16 +62,20 @@ def main():
             return
 
         # Apply the loaded transformation matrix
-        transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix)
-        transformation_matrix = create_center_based_transformation_matrix(transformed_glb_mesh, optimal_angle, optimal_tx, optimal_ty)
-        print("Transformation Matrix 4x4:\n", transformation_matrix)
+        transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix_1)
+        transformation_matrix_2 = create_center_based_transformation_matrix(transformed_glb_mesh, optimal_angle, optimal_tx, optimal_ty)
+        print("Transformation Matrix :\n", transformation_matrix_2)
 
         # Apply this transformation to the mesh
-        transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix)
-        transformations.append(transformation_matrix)
+        transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix_2)
+        transformations.append(transformation_matrix_2)
         final_transformation_matrix = accumulate_transformations(transformations)
-        print("Transformations:\n", final_transformation_matrix)
+        print(" Final Transformations:\n", final_transformation_matrix)
 
+        transformed_glb_mesh = o3d.io.read_triangle_mesh(glb_model_path)
+        transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix_1)
+        
+        visualize_glb_and_combined_meshes(combined_mesh, transformed_glb_mesh)
         
         # Visualize the results
         visualize_meshes_with_height_coloring(combined_mesh, transformed_glb_mesh)

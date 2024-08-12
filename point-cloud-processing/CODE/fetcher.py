@@ -34,6 +34,7 @@ def process_feature_list(collections_url, collection_id, feature_ids):
     for feature_id in feature_ids:
         feature_url = f"{collections_url}/{collection_id}/items/{feature_id}"
         feature = fetch_json(feature_url)
+        logging.info(f"Processing feature: {feature_id}")
         if feature:
             mesh, scale, translate = create_mesh_from_feature(feature)
             if mesh:

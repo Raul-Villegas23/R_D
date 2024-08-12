@@ -5,7 +5,7 @@ import open3d as o3d
 from fetcher import process_feature_list
 from mesh_processor import load_and_transform_glb_model, align_mesh_centers, apply_optimal_params
 from geometry_utils import extract_2d_perimeter, extract_latlon_orientation_from_mesh, calculate_intersection_error
-from transformation import optimize_rotation_and_translation, compute_z_offset, apply_z_offset, accumulate_transformations
+from transformation import optimize_rotation_and_translation, compute_z_offset, apply_z_offset, accumulate_transformations, create_center_based_transformation_matrix
 from visualization import visualize_glb_and_combined_meshes, visualize_2d_perimeters, visualize_meshes_with_height_coloring
 from icp_alignment import refine_alignment_with_icp
 from shapely.geometry import Polygon
@@ -60,7 +60,13 @@ def main():
                 # Save the optimal parameters for later use
                 np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_optimal_params.txt", [optimal_angle, optimal_tx, optimal_ty])
                 glb_mesh = apply_optimal_params(glb_mesh, optimal_angle, optimal_tx, optimal_ty)
-                
+                # Create the transformation matrix based on the optimal parameters
+                optimal_transformation_matrix = create_center_based_transformation_matrix(glb_mesh, optimal_angle, optimal_tx, optimal_ty)
+                transformations.append(optimal_transformation_matrix) # Append the optimal transformation matrix
+                logging.info(f"Optimal Transformation Matrix:\n{optimal_transformation_matrix}")
+
+
+
                 try:
                     # Compute the Z offset needed to align the floor of the GLB mesh with the combined mesh
                     z_offset1 = compute_z_offset(combined_mesh, glb_mesh)
@@ -101,14 +107,18 @@ def main():
                 final_transformation_matrix = accumulate_transformations(transformations)
                 logging.info(f" Final Transformation Matrix:\n{final_transformation_matrix}")
 
+                # Append the transformation from the optimal parameters to the final transformation matrix
+                # final_transformation_matrix = np.dot(final_transformation_matrix, create_center_based_transformation_matrix(glb_mesh, optimal_angle, optimal_tx, optimal_ty))
+
                 # Save the final transformation matrix and the lat, lon, and orientation to text files
                 transformation_matrix_filename = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
                 np.savetxt(transformation_matrix_filename, final_transformation_matrix)
                 with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
                     file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
-                
+
 
                 # Visualize the combined and GLB meshes with height coloring
+                o3d.visualization.draw_geometries([glb_mesh])
                 visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
                 visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
 
@@ -119,6 +129,10 @@ def main():
                 # Save the GLB mesh as a PLY file
                 ply_filename = glb_dataset.replace('.glb', '.ply')
                 o3d.io.write_triangle_mesh(f"RESULTS/{ply_filename}", glb_mesh)
+
+                # Save the GLB mesh as a GLTF file
+                gltf_filename = glb_dataset.replace('.glb', '.gltf')
+                o3d.io.write_triangle_mesh(f"RESULTS/{gltf_filename}", glb_mesh)
 
     logging.info(f"Elapsed time: {time.time() - start_time:.3f} seconds")
 
