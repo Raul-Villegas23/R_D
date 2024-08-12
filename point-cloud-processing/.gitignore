@@ -6,3 +6,5 @@
 /requirements(original).txt
 /myenv.yml
 __pycache__/
+# Ignore folder called experimental-analysis
+/experimental-analysis/
