@@ -56,14 +56,21 @@ def draw_maze():
                          fontsize=14, ha='center', va='center', color='black', weight='bold')
 
     def onclick(event):
-        # Handle click events and update the maze with user selections
-        if event.xdata is not None and event.ydata is not None:
-            ix, iy = int(event.xdata + 0.5), int(event.ydata + 0.5)
-            if 0 <= ix < grid_size and 0 <= iy < grid_size and (iy, ix) not in user_path and (iy, ix) not in {(0, 0), (6, 6)}:
-                user_path.add((iy, ix))
-                maze[iy, ix] = SELECTED
-                img.set_data(maze)
-                fig.canvas.draw_idle()
+        # Check if the click is within the plot area, not on the button
+        if event.inaxes == ax:
+            if event.xdata is not None and event.ydata is not None:
+                ix, iy = int(event.xdata + 0.5), int(event.ydata + 0.5)
+                if 0 <= ix < grid_size and 0 <= iy < grid_size and (iy, ix) not in {(0, 0), (6, 6)}:
+                    if (iy, ix) in user_path:
+                        # Deselect the block if it was already selected
+                        user_path.remove((iy, ix))
+                        maze[iy, ix] = EMPTY
+                    else:
+                        # Select the block if it was not already selected
+                        user_path.add((iy, ix))
+                        maze[iy, ix] = SELECTED
+                    img.set_data(maze)
+                    fig.canvas.draw_idle()
 
     fig.canvas.mpl_connect('button_press_event', onclick)
 
@@ -83,7 +90,7 @@ def draw_maze():
 
         # Define weights
         w_i = 1.0  # Weight for incorrect selections
-        w_m = 0.75  # Weight for missed selections
+        w_m = 1.0  # Weight for missed selections
 
         # Calculate weighted error
         total_selections = len(user_path)
@@ -116,7 +123,7 @@ def draw_maze():
         with open('maze_results.csv', mode='a', newline='') as file:
             writer = csv.writer(file)
             if not file_exists:
-                writer.writerow(['Attempt', 'Maze score'])
+                writer.writerow(['Participant', 'Maze score'])
             writer.writerow([attempt_number, f'{score:.2f}%'])
 
         # Print evaluation results
