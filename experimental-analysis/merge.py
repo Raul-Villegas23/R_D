@@ -15,17 +15,16 @@ print(nasa_tlx_data.head())
 print("\nParticipants Delays Data:")
 print(participants_delays_data.head())
 
-# Add an index to keep track of condition order for each participant
-nasa_tlx_data['Condition Index'] = nasa_tlx_data.groupby('Participant Number').cumcount()
-participants_delays_data['Condition Index'] = participants_delays_data.groupby('Participants').cumcount()
+# Add an index to each DataFrame based on the row number
+nasa_tlx_data['Row Index'] = nasa_tlx_data.index
+participants_delays_data['Row Index'] = participants_delays_data.index
 
-# Merge the two DataFrames based on Participant Number and Condition Index
+# Merge the two DataFrames based on the Row Index
 merged_data = pd.merge(nasa_tlx_data, participants_delays_data, how='left',
-                       left_on=['Participant Number', 'Condition Index'],
-                       right_on=['Participants', 'Condition Index'])
+                       on='Row Index')
 
-# Drop the redundant Participants column
-merged_data.drop(columns=['Participants'], inplace=True)
+# Drop the Row Index column
+merged_data.drop(columns=['Row Index'], inplace=True)
 
 # Rename columns for clarity
 merged_data.rename(columns={'Delays': 'Delay'}, inplace=True)
