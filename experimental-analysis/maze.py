@@ -89,8 +89,8 @@ def draw_maze():
         img.set_data(maze)
 
         # Define weights
-        w_i = 1.0  # Weight for incorrect selections
-        w_m = 1.0  # Weight for missed selections
+        w_i = 0.5  # Weight for incorrect selections
+        w_m = 0.5  # Weight for missed selections
 
         # Calculate weighted error
         total_selections = len(user_path)
