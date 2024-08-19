@@ -3,59 +3,6 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 from geometry_utils import calculate_centroid, compute_orientation
 
-def visualize_glb_and_combined_meshes(mesh1, mesh2):
-    """Visualize the GLB and combined meshes using Matplotlib."""
-    vertices1 = np.asarray(mesh1.vertices)
-    triangles1 = np.asarray(mesh1.triangles)
-
-    # Simplify the first mesh for visualization purposes
-    if mesh1.has_triangle_uvs():
-        mesh1.triangle_uvs = o3d.utility.Vector2dVector([])
-
-    mesh1 = mesh1.simplify_quadric_decimation(1000) #1000 is the number of vertices after simplification
-    vertices1 = np.asarray(mesh1.vertices)
-    triangles1 = np.asarray(mesh1.triangles)
-    
-    # Simplify the second mesh for visualization purposes
-    if mesh2.has_triangle_uvs():
-        mesh2.triangle_uvs = o3d.utility.Vector2dVector([])
-    
-    mesh2 = mesh2.simplify_quadric_decimation(1000) #1000 is the number of vertices after simplification
-    vertices2 = np.asarray(mesh2.vertices)
-    triangles2 = np.asarray(mesh2.triangles)
-
-    # Create the figure and 3D axes
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    # ax.scatter(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], c='k', marker='o', s=5, label='3D BAG Mesh Vertices')
-
-    # Create a 3D surface plot using plot_trisurf with a colormap
-    cmap = 'plasma'
-    cmap2 = 'viridis'
-    ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap = cmap, edgecolor='k', alpha=0.5)
-    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap= cmap2, edgecolor='k', alpha=0.5)  
-    
-    # Auto scale to the mesh size
-    scale = np.concatenate((vertices1, vertices2)).flatten()
-    ax.auto_scale_xyz(scale, scale, scale)
-    
-    # Figure name
-    ax.set_title('3D BAG and GLB Meshes')
-    
-    # Set axis limits based on the range of vertices
-    xlim = (min(vertices1[:, 0].min(), vertices2[:, 0].min()), max(vertices1[:, 0].max(), vertices2[:, 0].max()))
-    ylim = (min(vertices1[:, 1].min(), vertices2[:, 1].min()), max(vertices1[:, 1].max(), vertices2[:, 1].max()))
-    zlim = (min(vertices1[:, 2].min(), vertices2[:, 2].min()), max(vertices1[:, 2].max(), vertices2[:, 2].max()))
-    ax.set_xlim(xlim)
-    ax.set_ylim(ylim)
-    ax.set_zlim(zlim)
-    
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    
-    # Show the plot
-    plt.show()
 
 def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     """Visualize three 2D perimeters, their centroids, orientations, and longest edges using Matplotlib."""
@@ -103,7 +50,7 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     plt.tight_layout(rect=[0, 0, 0.75, 1])  # Adjust layout to make room for the legend
     plt.show()
 
-def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='plasma', colormap_2='viridis'):
+def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='plasma', colormap_2='winter'):
 
     def color_mesh_by_height(mesh, colormap_name):
         vertices = np.asarray(mesh.vertices)

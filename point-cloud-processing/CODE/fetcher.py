@@ -7,14 +7,7 @@ from mesh_processor import create_mesh_from_feature
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def fetch_json(url):
-    """Fetch JSON data from a specified URL.
-
-    Args:
-        url (str): The URL to fetch data from.
-
-    Returns:
-        dict: The JSON data fetched from the URL or None if an error occurred.
-    """
+    """Fetch JSON data from the given URL."""
     try:
         response = requests.get(url)
         response.raise_for_status()

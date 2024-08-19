@@ -3,10 +3,11 @@ import time
 import numpy as np
 import open3d as o3d
 from fetcher import process_feature_list
+from geolocation import extract_latlon_orientation_from_mesh
 from mesh_processor import load_and_transform_glb_model, align_mesh_centers, apply_optimal_params
-from geometry_utils import extract_2d_perimeter, extract_latlon_orientation_from_mesh, calculate_intersection_error, optimize_rotation_and_translation
-from transformation import compute_z_offset, apply_z_offset, accumulate_transformations, create_center_based_transformation_matrix
-from visualization import visualize_glb_and_combined_meshes, visualize_2d_perimeters, visualize_meshes_with_height_coloring
+from geometry_utils import extract_2d_perimeter, optimize_rotation_and_translation
+from transformation_utils import compute_z_offset, apply_z_offset, accumulate_transformations, create_center_based_transformation_matrix
+from visualization_utils import visualize_2d_perimeters, visualize_meshes_with_height_coloring
 from icp_alignment import refine_alignment_with_icp
 
 
@@ -108,17 +109,16 @@ def main():
                 with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
                     file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
 
-                combined_mesh.compute_vertex_normals()
-                # Visualize the combined and GLB meshes with height coloring
                 visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
-                
-                o3d.visualization.draw_geometries([combined_mesh], window_name="3D BAG and GLB Meshes")
-                o3d.visualization.draw_geometries([glb_mesh], window_name="3D BAG and GLB Meshes")
+
                 # visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
-               
                 # Visualize the 2D perimeters and the intersection
                 perimeter3 = extract_2d_perimeter(glb_mesh) # Extract the 2D perimeter of the GLB mesh after alignment
                 visualize_2d_perimeters(perimeter1, perimeter3, perimeter2)
+
+                # Save the GLB mesh as a Obj file
+                obj_filename = glb_dataset.replace('.glb', '.obj')
+                o3d.io.write_triangle_mesh(f"RESULTS/{obj_filename}", glb_mesh)
 
                 # Save the GLB mesh as a PLY file
                 ply_filename = glb_dataset.replace('.glb', '.ply')
@@ -132,7 +132,9 @@ def main():
                 combined_ply_filename = f"{collection_id}_combined.ply"
                 o3d.io.write_triangle_mesh(f"RESULTS/{combined_ply_filename}", combined_mesh)
 
+
     logging.info(f"Elapsed time: {time.time() - start_time:.3f} seconds")
+    # Visualize the combined and GLB meshes with height coloring
 
 if __name__ == "__main__":
     main()

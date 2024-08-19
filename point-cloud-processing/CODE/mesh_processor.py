@@ -72,25 +72,45 @@ def create_mesh_from_feature(feature):
 
 def load_and_transform_glb_model(file_path, translate):
     """Load and transform a GLB model."""
-    mesh = o3d.io.read_triangle_mesh(file_path)
+    mesh = o3d.io.read_triangle_mesh(file_path, False)  # Load the GLB model without any geometry optimization
+
     if not mesh.has_vertices() or not mesh.has_triangles():
         logging.error("The GLB model has no vertices or triangles.")
         return None, None
-
-    vertices = np.asarray(mesh.vertices)
-
-    # Transformation to convert the GLB model to the right-handed coordinate system
-    transformation_matrix = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
-    vertices = np.dot(vertices, transformation_matrix.T) + translate
-    mesh.vertices = o3d.utility.Vector3dVector(vertices)
-    mesh.compute_vertex_normals()
+    # Check if the mesh has colors
+    if mesh.has_vertex_colors():
+        mesh.vertex_colors = o3d.utility.Vector3dVector(np.ones_like(np.asarray(mesh
+        .vertices)))
     
-    # Create the initial transformation matrix as a homogeneous transformation
-    initial_transformation = np.eye(4)
-    initial_transformation[:3, :3] = transformation_matrix
-    initial_transformation[:3, 3] = translate
-    
-    return mesh, initial_transformation
+    # Manually center the mesh
+    bbox = mesh.get_axis_aligned_bounding_box()
+    mesh_center = bbox.get_center()
+    mesh.translate(-mesh_center)
+
+    # Transformation matrix to convert the GLB model to the right-handed coordinate system
+    transformation_matrix = np.array([
+        [-1, 0, 0, 0],  # Flip X-axis
+        [0, 0, 1, 0],   # Swap Z and Y axes
+        [0, 1, 0, 0],   # Swap Y and Z axes
+        [0, 0, 0, 1]    # Homogeneous coordinate
+    ])
+
+    # Translation matrix as a homogeneous transformation
+    translation_matrix = np.eye(4)
+    translation_matrix[:3, 3] = translate
+
+    # Combine the rotation and translation
+    combined_transformation = translation_matrix @ transformation_matrix
+
+    # Apply the combined transformation to the mesh
+    mesh.transform(combined_transformation)
+
+    # Recompute vertex normals after transformation
+    # mesh.compute_vertex_normals()
+    # mesh.compute_triangle_normals()
+
+    # Return the transformed mesh and the transformation matrix used
+    return mesh, combined_transformation
 
 
 def align_mesh_centers(mesh1, mesh2):

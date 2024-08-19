@@ -4,9 +4,9 @@ import numpy as np
 import open3d as o3d
 from fetcher import fetch_json, process_feature_list
 from mesh_processor import create_mesh_from_feature, apply_transformation
-from transformation import optimize_rotation_and_translation, compute_z_offset, apply_z_offset, accumulate_transformations, create_center_based_transformation_matrix
-from geometry_utils import extract_2d_perimeter, extract_latlon_orientation_from_mesh, calculate_intersection_error
-from visualization import visualize_glb_and_combined_meshes, visualize_2d_perimeters, visualize_meshes_with_height_coloring
+from CODE.transformation_utils import  compute_z_offset, apply_z_offset, accumulate_transformations, create_center_based_transformation_matrix
+from geometry_utils import extract_2d_perimeter, extract_latlon_orientation_from_mesh, calculate_intersection_error, optimize_rotation_and_translation
+from CODE.visualization_utils import visualize_glb_and_combined_meshes, visualize_2d_perimeters, visualize_meshes_with_height_coloring
 from icp_alignment import refine_alignment_with_icp
 
 # Setup logging
