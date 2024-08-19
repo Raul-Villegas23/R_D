@@ -2,24 +2,24 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load the data from the CSV file
-csv_file = 'nasa_tlx_data.csv'
+csv_file = 'merged_nasa_tlx_data.csv'
 data = pd.read_csv(csv_file)
 
 # Display the first few rows of the dataframe to verify the contents
 print(data.head())
 
-# Plotting each dimension in separate bar charts
+# Plotting each dimension vs Delay
 def plot_dimension(data, dimension, ax):
-    ax.bar(data['Participant Number'], data[dimension], color='blue', alpha=0.7)
-    ax.set_title(f'{dimension} Scores')
-    ax.set_xlabel('Participant Number')
+    ax.bar(data['Delay'], data[dimension], color='blue', alpha=0.7)
+    ax.set_title(f'{dimension} Scores vs Delay')
+    ax.set_xlabel('Delay (ms)')
     ax.set_ylabel('Score')
     ax.set_ylim(0, 100)
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
 
 # Create subplots for each dimension and overall score
 fig, axs = plt.subplots(3, 2, figsize=(12, 10))
-fig.suptitle('NASA TLX Results')
+fig.suptitle('NASA TLX Results vs Time Delays')
 
 # List of dimensions to plot
 dimensions = [
@@ -36,9 +36,9 @@ for i, dimension in enumerate(dimensions):
     plot_dimension(data, dimension, axs[i // 2, i % 2])
 
 # Plot Overall Score separately
-axs[2, 1].bar(data['Participant Number'], data['Overall Score'], color='green', alpha=0.7)
-axs[2, 1].set_title('Overall Scores')
-axs[2, 1].set_xlabel('Participant Number')
+axs[2, 1].bar(data['Delay'], data['Overall Score'], color='green', alpha=0.7)
+axs[2, 1].set_title('Overall Scores vs Delay')
+axs[2, 1].set_xlabel('Delay (ms)')
 axs[2, 1].set_ylabel('Score')
 axs[2, 1].set_ylim(0, 100)
 axs[2, 1].grid(True, which='both', linestyle='--', linewidth=0.5)
@@ -47,14 +47,14 @@ axs[2, 1].grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 plt.show()
 
-# Plotting a single graph to see everything
+# Plotting a single graph to see everything vs Delay
 plt.figure(figsize=(14, 8))
 for dimension in dimensions:
-    plt.plot(data['Participant Number'], data[dimension], marker='o', label=dimension)
+    plt.plot(data['Delay'], data[dimension], marker='o', label=dimension)
 
-plt.plot(data['Participant Number'], data['Overall Score'], marker='o', color='black', linestyle='--', linewidth=2, label='Overall Score')
-plt.title('NASA TLX Scores Across Participants')
-plt.xlabel('Participant Number')
+plt.plot(data['Delay'], data['Overall Score'], marker='o', color='black', linestyle='--', linewidth=2, label='Overall Score')
+plt.title('NASA TLX Scores Across Delays')
+plt.xlabel('Delay (ms)')
 plt.ylabel('Score')
 plt.ylim(0, 100)
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)

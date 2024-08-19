@@ -11,7 +11,7 @@ def apply_transformation(mesh, transformation_matrix):
     return mesh
 
 def create_mesh_from_feature(feature):
-    """Create a mesh object from feature data."""
+    """Create a mesh object using only the highest LoD from feature data."""
     if 'vertices' in feature['feature']:
         vertices = np.array(feature['feature']['vertices'])
         transform = feature['metadata'].get('transform', {})
@@ -23,14 +23,49 @@ def create_mesh_from_feature(feature):
         mesh.vertices = o3d.utility.Vector3dVector(vertices)
 
         city_objects = feature['feature'].get('CityObjects', {})
+        max_lod = None
+        max_lod_geom = None
+
+        # Find the highest LoD
         for obj in city_objects.values():
             for geom in obj.get('geometry', []):
-                for boundary in geom.get('boundaries', []):
-                    for i in range(1, len(boundary[0]) - 1):
-                        mesh.triangles.append([boundary[0][0], boundary[0][i], boundary[0][i + 1]])
+                lod = geom.get('lod', None)
+                if max_lod is None or (lod is not None and float(lod) > float(max_lod)):
+                    max_lod = lod
+                    max_lod_geom = geom
 
-        mesh.triangles = o3d.utility.Vector3iVector(mesh.triangles)
-        return mesh, scale, translate
+        if max_lod_geom:
+            # print(f"Using highest LoD: {max_lod}")
+
+            triangle_count = 0  # To keep track of the number of triangles created
+
+            for boundary_group in max_lod_geom.get('boundaries', []):
+                # Each boundary_group may contain multiple boundaries (each a polygon)
+                for boundary in boundary_group:
+                    if isinstance(boundary[0], list):  # Check if the boundary is nested
+                        for sub_boundary in boundary:
+                            # print(f"  Sub-boundary: {sub_boundary}")  # Debugging: Print the sub-boundary structure
+                            if len(sub_boundary) >= 3:  # Ensure there are at least 3 points to form a triangle
+                                for i in range(1, len(sub_boundary) - 1):
+                                    mesh.triangles.append([sub_boundary[0], sub_boundary[i], sub_boundary[i + 1]])
+                                    triangle_count += 1
+                                    # Print the triangle that is being added
+                                    # print(f"Triangle {triangle_count} (LoD {max_lod}): [{sub_boundary[0]}, {sub_boundary[i]}, {sub_boundary[i + 1]}]")
+                    else:
+                        # print(f"  Boundary: {boundary}")  # Debugging: Print the boundary structure
+                        if len(boundary) >= 3:  # Ensure there are at least 3 points to form a triangle
+                            for i in range(1, len(boundary) - 1):
+                                mesh.triangles.append([boundary[0], boundary[i], boundary[i + 1]])
+                                triangle_count += 1
+                                # Print the triangle that is being added
+                                # print(f"Triangle {triangle_count} (LoD {max_lod}): [{boundary[0]}, {boundary[i]}, {boundary[i + 1]}]")
+
+            mesh.triangles = o3d.utility.Vector3iVector(mesh.triangles)
+            # print(f"Total number of triangles created: {triangle_count}")
+            return mesh, scale, translate
+        else:
+            logging.error("No geometry data found for the highest LoD.")
+            return None, None, None
     else:
         logging.error("No vertices found in the feature data.")
         return None, None, None

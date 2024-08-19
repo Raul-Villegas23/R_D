@@ -31,7 +31,7 @@ def refine_alignment_with_icp(source_mesh, target_mesh, threshold=1.0, initial_m
         if transformation_change < convergence_threshold:
             print(f"ICP converged with {max_iterations} iterations, change: {transformation_change:.6f}")
             source.transform(reg_p2p.transformation)
-            print(reg_p2p)
+            # print(reg_p2p)
             return source, reg_p2p.transformation
 
         # Update last transformation and increase max_iterations

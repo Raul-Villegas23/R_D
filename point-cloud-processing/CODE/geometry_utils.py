@@ -3,6 +3,7 @@ from scipy.spatial import ConvexHull
 from shapely.geometry import Polygon
 from shapely.affinity import rotate
 from pyproj import Transformer
+from scipy.optimize import minimize
 
 def extract_2d_perimeter(mesh):
     """Extract the 2D perimeter of the mesh by projecting onto the xy-plane and computing the convex hull."""
@@ -10,6 +11,19 @@ def extract_2d_perimeter(mesh):
     hull = ConvexHull(vertices)
     perimeter_points = vertices[hull.vertices]
     return np.vstack([perimeter_points, perimeter_points[0]])
+
+def optimize_rotation_and_translation(perimeter1, perimeter2):
+    """Optimize rotation angle and translation to align two perimeters."""
+    initial_guesses = [[-45.0, 0.0, 0.0], [45.0, 0.0, 0.0], [90.0, 0.0, 0.0], [-90.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+    bounds = [(-180, 180), (-np.inf, np.inf), (-np.inf, np.inf)]
+    best_result, lowest_error = None, float('inf')
+
+    for initial_guess in initial_guesses:
+        result = minimize(calculate_intersection_error, initial_guess, args=(perimeter1, perimeter2), method='L-BFGS-B', bounds=bounds)
+        if result.success and result.fun < lowest_error:
+            best_result, lowest_error = result, result.fun
+
+    return best_result.x if best_result else None
 
 def extract_latlon_orientation_from_mesh(mesh, reference_system):
     """Extract longitude, latitude, and orientation from mesh vertices."""

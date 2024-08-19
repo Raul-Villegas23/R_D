@@ -1,13 +1,18 @@
 import numpy as np
 import open3d as o3d
 import matplotlib.pyplot as plt
-from scipy.spatial import ConvexHull
-from shapely.geometry import Polygon
-from shapely.affinity import rotate
 from geometry_utils import calculate_centroid, compute_orientation
 
 def visualize_glb_and_combined_meshes(mesh1, mesh2):
     """Visualize the GLB and combined meshes using Matplotlib."""
+    vertices1 = np.asarray(mesh1.vertices)
+    triangles1 = np.asarray(mesh1.triangles)
+
+    # Simplify the first mesh for visualization purposes
+    if mesh1.has_triangle_uvs():
+        mesh1.triangle_uvs = o3d.utility.Vector2dVector([])
+
+    mesh1 = mesh1.simplify_quadric_decimation(1000) #1000 is the number of vertices after simplification
     vertices1 = np.asarray(mesh1.vertices)
     triangles1 = np.asarray(mesh1.triangles)
     
@@ -25,9 +30,10 @@ def visualize_glb_and_combined_meshes(mesh1, mesh2):
     # ax.scatter(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], c='k', marker='o', s=5, label='3D BAG Mesh Vertices')
 
     # Create a 3D surface plot using plot_trisurf with a colormap
-    cmap = 'viridis'
+    cmap = 'plasma'
+    cmap2 = 'viridis'
     ax.plot_trisurf(vertices1[:, 0], vertices1[:, 1], vertices1[:, 2], triangles=triangles1, cmap = cmap, edgecolor='k', alpha=0.5)
-    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap= cmap, edgecolor='k', alpha=0.5)  
+    ax.plot_trisurf(vertices2[:, 0], vertices2[:, 1], vertices2[:, 2], triangles=triangles2, cmap= cmap2, edgecolor='k', alpha=0.5)  
     
     # Auto scale to the mesh size
     scale = np.concatenate((vertices1, vertices2)).flatten()
@@ -68,25 +74,15 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     ax.plot(centroid3[0], centroid3[1], 'go', label='Centroid Non-aligned')
 
     # Compute and display orientations
-    orientation1, longest_edge1 = compute_orientation(perimeter1)
     orientation2, longest_edge2 = compute_orientation(perimeter2)
-    orientation3, longest_edge3 = compute_orientation(perimeter3)
 
     # ax.text(centroid1[0], centroid1[1], f'{orientation1:.1f}°', color='red', fontsize=12, ha='right')
     ax.text(centroid2[0], centroid2[1], f'{orientation2:.1f}°', color='blue', fontsize=12, ha='right')
     # ax.text(centroid3[0], centroid3[1], f'{orientation3:.1f}°', color='green', fontsize=12, ha='right')
 
-    # Plot north and east direction arrow (adjust the coordinates as needed)
-    # ax.plot([centroid2[0], centroid2[0]], [centroid2[1], centroid2[1] + 6], 'k--', linewidth= 0.5)
-    # ax.plot([centroid2[0], centroid2[0] + 6], [centroid2[1], centroid2[1]], 'k--', linewidth= 0.5)
- 
     # Plot the longest edges
-    # if longest_edge1[0] is not None and longest_edge1[1] is not None:
-    #     ax.plot([longest_edge1[0][0], longest_edge1[1][0]], [longest_edge1[0][1], longest_edge1[1][1]], 'r--', linewidth=2, label='Longest Edge 3D BAG Mesh')
     if longest_edge2[0] is not None and longest_edge2[1] is not None:
         ax.plot([longest_edge2[0][0], longest_edge2[1][0]], [longest_edge2[0][1], longest_edge2[1][1]], 'b--', linewidth=1, label='Longest Edge GLB Mesh')
-    # if longest_edge3[0] is not None and longest_edge3[1] is not None:
-    #     ax.plot([longest_edge3[0][0], longest_edge3[1][0]], [longest_edge3[0][1], longest_edge3[1][1]], 'g--', linewidth=2, label='Longest Edge Non-optimized')
 
     # Plot orientation lines from centroid to the direction given by orientation angle
     def plot_orientation_line(centroid, orientation, color):
@@ -95,9 +91,8 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
         end_y = centroid[1] + length * np.sin(np.radians(orientation))
         ax.plot([centroid[0], end_x], [centroid[1], end_y], color=color, linestyle='--')
 
-    # plot_orientation_line(centroid1, orientation1, 'red')
     plot_orientation_line(centroid2, orientation2, 'blue')
-    # plot_orientation_line(centroid3, orientation3, 'green')
+
     # Adjust legend position to be outside the plot
     ax.legend(loc='upper left', bbox_to_anchor=(1, 1), borderaxespad=0.)
 
@@ -108,27 +103,21 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     plt.tight_layout(rect=[0, 0, 0.75, 1])  # Adjust layout to make room for the legend
     plt.show()
 
-def color_mesh_by_height(mesh):
-    vertices = np.asarray(mesh.vertices)
-    heights = vertices[:, 2]
-    min_height = np.min(heights)
-    max_height = np.max(heights)
-    normalized_heights = (heights - min_height) / (max_height - min_height)
-    colors = plt.get_cmap('rainbow')(normalized_heights)[:, :3]
-    mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
-    return mesh
+def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='plasma', colormap_2='viridis'):
 
-def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh):
-    """
-    Color the meshes by height and visualize them using Open3D.
+    def color_mesh_by_height(mesh, colormap_name):
+        vertices = np.asarray(mesh.vertices)
+        heights = vertices[:, 2]
+        min_height = np.min(heights)
+        max_height = np.max(heights)
+        normalized_heights = (heights - min_height) / (max_height - min_height)
+        colors = plt.get_cmap(colormap_name)(normalized_heights)[:, :3]
+        mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
+        return mesh
 
-    Parameters:
-    - combined_mesh (open3d.geometry.TriangleMesh): The combined mesh to be visualized.
-    - glb_mesh (open3d.geometry.TriangleMesh): The GLB mesh to be visualized.
-    """
-    # Color the meshes based on height
-    glb_mesh = color_mesh_by_height(glb_mesh)
-    combined_mesh = color_mesh_by_height(combined_mesh)
+    # Color the meshes based on height with different colormaps
+    glb_mesh = color_mesh_by_height(glb_mesh, colormap_1)
+    combined_mesh = color_mesh_by_height(combined_mesh, colormap_2)
 
     # Visualize the meshes using Open3D
     o3d.visualization.draw_geometries(
@@ -140,5 +129,5 @@ def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh):
         top=50,
         point_show_normal=False,
         mesh_show_wireframe=False,
-        mesh_show_back_face=True
+        mesh_show_back_face=True,
     )

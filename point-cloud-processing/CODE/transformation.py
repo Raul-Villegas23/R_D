@@ -1,21 +1,5 @@
 import numpy as np
-from scipy.optimize import minimize
-from geometry_utils import calculate_intersection_error
 
-
-
-def optimize_rotation_and_translation(perimeter1, perimeter2):
-    """Optimize rotation angle and translation to align two perimeters."""
-    initial_guesses = [[-45.0, 0.0, 0.0], [45.0, 0.0, 0.0], [90.0, 0.0, 0.0], [-90.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-    bounds = [(-180, 180), (-np.inf, np.inf), (-np.inf, np.inf)]
-    best_result, lowest_error = None, float('inf')
-
-    for initial_guess in initial_guesses:
-        result = minimize(calculate_intersection_error, initial_guess, args=(perimeter1, perimeter2), method='L-BFGS-B', bounds=bounds)
-        if result.success and result.fun < lowest_error:
-            best_result, lowest_error = result, result.fun
-
-    return best_result.x if best_result else None
 
 def compute_z_offset(combined_mesh, glb_mesh):
     """
@@ -111,27 +95,3 @@ def create_center_based_transformation_matrix(mesh, optimal_angle, optimal_tx, o
     
     return combined_transformation_matrix
 
-def create_complete_transformation_matrix(optimal_angle, optimal_tx, optimal_ty):
-    # Create a 4x4 identity matrix
-    transformation_matrix = np.eye(4)
-
-    # Calculate rotation matrix around the Z-axis
-    cos_theta = np.cos(np.radians(optimal_angle))
-    sin_theta = np.sin(np.radians(optimal_angle))
-
-    rotation_matrix = np.array([
-        [cos_theta, -sin_theta, 0, 0],
-        [sin_theta, cos_theta, 0, 0],
-        [0, 0, 1, 0],
-        [0, 0, 0, 1]
-    ])
-
-    # Translation matrix
-    translation_matrix = np.eye(4)
-    translation_matrix[0, 3] = optimal_tx
-    translation_matrix[1, 3] = optimal_ty
-
-    # Combine rotation and translation matrices
-    transformation_matrix = rotation_matrix @ translation_matrix
-
-    return transformation_matrix
