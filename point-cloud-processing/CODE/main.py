@@ -111,14 +111,10 @@ def main():
 
                 visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
 
-                # visualize_glb_and_combined_meshes(combined_mesh, glb_mesh)
-                # Visualize the 2D perimeters and the intersection
-                perimeter3 = extract_2d_perimeter(glb_mesh) # Extract the 2D perimeter of the GLB mesh after alignment
-                visualize_2d_perimeters(perimeter1, perimeter3, perimeter2)
-
+                
                 # Save the GLB mesh as a Obj file
                 obj_filename = glb_dataset.replace('.glb', '.obj')
-                o3d.io.write_triangle_mesh(f"RESULTS/{obj_filename}", glb_mesh)
+                o3d.io.write_triangle_mesh(f"RESULTS/{obj_filename}", glb_mesh, write_triangle_uvs=True)
 
                 # Save the GLB mesh as a PLY file
                 ply_filename = glb_dataset.replace('.glb', '.ply')
@@ -135,6 +131,9 @@ def main():
 
     logging.info(f"Elapsed time: {time.time() - start_time:.3f} seconds")
     # Visualize the combined and GLB meshes with height coloring
+    # # Visualize the 2D perimeters and the intersection
+    # perimeter3 = extract_2d_perimeter(glb_mesh) # Extract the 2D perimeter of the GLB mesh after alignment
+    # visualize_2d_perimeters(perimeter1, perimeter3, perimeter2)
 
 if __name__ == "__main__":
     main()

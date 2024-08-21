@@ -62,13 +62,13 @@ def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='p
         mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
         return mesh
 
-    # Color the meshes based on height with different colormaps
-    glb_mesh = color_mesh_by_height(glb_mesh, colormap_1)
-    combined_mesh = color_mesh_by_height(combined_mesh, colormap_2)
+    # Color a copy of the meshes based on height with different colormaps
+    combined_mesh_colored = color_mesh_by_height(combined_mesh, colormap_1)
+    glb_mesh_colored = color_mesh_by_height(glb_mesh, colormap_2)
 
     # Visualize the meshes using Open3D
     o3d.visualization.draw_geometries(
-        [combined_mesh, glb_mesh],
+        [combined_mesh_colored, glb_mesh_colored],
         window_name="3D BAG and GLB Meshes",
         width=800,
         height=600,
