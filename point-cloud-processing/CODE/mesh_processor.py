@@ -30,7 +30,7 @@ def create_mesh_from_feature(feature):
         for obj in city_objects.values():
             for geom in obj.get('geometry', []):
                 lod = geom.get('lod', None)
-                if max_lod is None or (lod is not None and float(lod) > float(max_lod)): 
+                if max_lod is None or (lod is not None and float(lod) > float(max_lod)):  # "<" for lowest LoD
                     max_lod = lod
                     max_lod_geom = geom
 
@@ -77,9 +77,7 @@ def load_and_transform_glb_model(file_path, translate):
     if not mesh.has_vertices() or not mesh.has_triangles():
         logging.error("The GLB model has no vertices or triangles.")
         return None, None
-    
-    o3d.visualization.draw_geometries([mesh])
-    
+       
     # Manually center the mesh
     bbox = mesh.get_axis_aligned_bounding_box()
     mesh_center = bbox.get_center()

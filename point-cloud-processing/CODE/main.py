@@ -57,7 +57,7 @@ def main():
                 optimal_angle, optimal_tx, optimal_ty = optimal_params
 
                 # Save the optimal parameters for later use
-                np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_optimal_params.txt", [optimal_angle, optimal_tx, optimal_ty])
+                # np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_optimal_params.txt", [optimal_angle, optimal_tx, optimal_ty])
                 glb_mesh = apply_optimal_params(glb_mesh, optimal_angle, optimal_tx, optimal_ty)
 
                 # Create a transformation matrix based on the optimal parameters
@@ -77,7 +77,7 @@ def main():
                 except ValueError as e:
                     logging.error(f"Error computing Z-offset: {e}")
                     return
-
+                
                 # Refine the alignment using ICP and calculate the final transformation matrix
                 glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, combined_mesh)
                 transformations.append(icp_transformation) # Append the ICP transformation matrix
@@ -102,31 +102,43 @@ def main():
 
                 # Accumulate the transformations to get the final transformation matrix
                 final_transformation_matrix = accumulate_transformations(transformations)
+                logging.info(f"Final transformation matrix:\n{final_transformation_matrix}")
 
                 # Save the final transformation matrix and the lat, lon, and orientation to text files
-                transformation_matrix_filename = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
-                np.savetxt(transformation_matrix_filename, final_transformation_matrix)
-                with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
-                    file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
+                # transformation_matrix_filename = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
+                # np.savetxt(transformation_matrix_filename, final_transformation_matrix)
+                # with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
+                #     file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
+                
+                # Compute vertex normals after transformation
+                # glb_mesh.compute_vertex_normals()
 
                 visualize_meshes_with_height_coloring(combined_mesh, glb_mesh)
 
-                
+                # Save the glb mesh as a GLB file
+                glb_filename = glb_dataset.replace('.glb', '_aligned.glb')
+                o3d.io.write_triangle_mesh(f"RESULTS/{glb_filename}", glb_mesh, print_progress=True)
+
                 # Save the GLB mesh as a Obj file
                 obj_filename = glb_dataset.replace('.glb', '.obj')
-                o3d.io.write_triangle_mesh(f"RESULTS/{obj_filename}", glb_mesh, write_triangle_uvs=True)
+                o3d.io.write_triangle_mesh(f"RESULTS/{obj_filename}", glb_mesh, print_progress=True)
 
                 # Save the GLB mesh as a PLY file
                 ply_filename = glb_dataset.replace('.glb', '.ply')
-                o3d.io.write_triangle_mesh(f"RESULTS/{ply_filename}", glb_mesh)
+                o3d.io.write_triangle_mesh(f"RESULTS/{ply_filename}", glb_mesh,  print_progress=True)
 
                 # Save the GLB mesh as a GLTF file
                 gltf_filename = glb_dataset.replace('.glb', '.gltf')
-                o3d.io.write_triangle_mesh(f"RESULTS/{gltf_filename}", glb_mesh)
+                o3d.io.write_triangle_mesh(f"RESULTS/{gltf_filename}", glb_mesh, print_progress=True)
 
-                # Save the combined mesh as a PLY file
-                combined_ply_filename = f"{collection_id}_combined.ply"
-                o3d.io.write_triangle_mesh(f"RESULTS/{combined_ply_filename}", combined_mesh)
+                # Save the combined mesh as a PLY file with a distinct filename with the glb dataset name
+                combined_ply_filename = glb_dataset.replace('.glb', '_combined.ply')
+                o3d.io.write_triangle_mesh(f"RESULTS/{combined_ply_filename}", combined_mesh, print_progress=True)
+
+                # Combine the glb and combined meshes into one and then save them as a PLY file
+                combined_mesh += glb_mesh
+                combined_ply_filename = glb_dataset.replace('.glb', '_combined_meshes.ply')
+                o3d.io.write_triangle_mesh(f"RESULTS/{combined_ply_filename}", combined_mesh, print_progress=True)
 
 
     logging.info(f"Elapsed time: {time.time() - start_time:.3f} seconds")

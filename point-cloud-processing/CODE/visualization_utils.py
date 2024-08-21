@@ -50,7 +50,7 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     plt.tight_layout(rect=[0, 0, 0.75, 1])  # Adjust layout to make room for the legend
     plt.show()
 
-def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='plasma', colormap_2='winter'):
+def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='summer', colormap_2='winter'):
 
     def color_mesh_by_height(mesh, colormap_name):
         vertices = np.asarray(mesh.vertices)
@@ -76,5 +76,5 @@ def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='p
         top=50,
         point_show_normal=False,
         mesh_show_wireframe=False,
-        mesh_show_back_face=True,
+        mesh_show_back_face=False,
     )
