@@ -35,8 +35,8 @@ def process_feature_list(collections_url, collection_id, feature_ids):
             reference_system = feature['metadata'].get('metadata', {}).get('referenceSystem')
 
     if meshes:
-        combined_mesh = sum(meshes, o3d.geometry.TriangleMesh())
-        return combined_mesh, scale, translate, reference_system
+        bag_mesh = sum(meshes, o3d.geometry.TriangleMesh())
+        return bag_mesh, scale, translate, reference_system
     else:
         logging.error("No meshes to visualize.")
         return None, None, None, None

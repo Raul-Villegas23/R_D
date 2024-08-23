@@ -2,13 +2,6 @@ import numpy as np
 import open3d as o3d
 import logging
 
-def apply_transformation(mesh, transformation_matrix):
-    """Apply transformation matrix to the mesh."""
-    vertices = np.asarray(mesh.vertices)
-    transformed_vertices = (transformation_matrix[:3, :3] @ vertices.T).T + transformation_matrix[:3, 3]
-    mesh.vertices = o3d.utility.Vector3dVector(transformed_vertices)
-    mesh.compute_vertex_normals()
-    return mesh
 
 def create_mesh_from_feature(feature):
     """Create a mesh object using only the highest LoD from feature data."""
@@ -72,18 +65,19 @@ def create_mesh_from_feature(feature):
 
 def load_and_transform_glb_model(file_path, translate):
     """Load and transform a GLB model."""
-    mesh = o3d.io.read_triangle_mesh(file_path, False)  # Load the GLB model without any geometry optimization
+    mesh = o3d.io.read_triangle_mesh(file_path, enable_post_processing= True) # Load the GLB model without any pre-processing (False) , True for pre-processing
 
     if not mesh.has_vertices() or not mesh.has_triangles():
         logging.error("The GLB model has no vertices or triangles.")
         return None, None
        
-    # Manually center the mesh
+    # Manually center the mesh using its bounding box center as the origin
     bbox = mesh.get_axis_aligned_bounding_box()
     mesh_center = bbox.get_center()
     mesh.translate(-mesh_center)
 
     # Transformation matrix to convert the GLB model to the right-handed coordinate system
+    # Given that the GLB-model is in the left-handed coordinate system (Y-up, Z-forward, X-right)
     transformation_matrix = np.array([
         [-1, 0, 0, 0],  # Flip X-axis
         [0, 0, 1, 0],   # Swap Z and Y axes
@@ -93,13 +87,14 @@ def load_and_transform_glb_model(file_path, translate):
 
     # Translation matrix as a homogeneous transformation
     translation_matrix = np.eye(4)
-    translation_matrix[:3, 3] = translate
+    translation_matrix[:3, 3] = translate # Translate the GLB model to the 3DBAG origin (extracted from the feature data)
 
     # Combine the rotation and translation
     combined_transformation = translation_matrix @ transformation_matrix
 
     # Apply the combined transformation to the mesh
     mesh.transform(combined_transformation)
+
 
     # Recompute vertex normals after transformation
     # mesh.compute_vertex_normals()
@@ -120,16 +115,19 @@ def align_mesh_centers(mesh1, mesh2):
 
 def apply_optimal_params(mesh, optimal_angle, optimal_tx, optimal_ty):
     """Apply the optimal rotation and translation to the mesh."""
-    # Apply optimal rotation
+
+    # Define the rotation matrix using the optimal rotation angle found during optimization
+    # The rotation is applied around the Z-axis
     rotation_matrix = mesh.get_rotation_matrix_from_xyz((0, 0, np.radians(optimal_angle)))
     mesh.rotate(rotation_matrix, center=mesh.get_center())
     
-    # Apply optimal translation
+    # Define the translation vector using the optimal translation parameters
+    # The translation is applied in the X and Y directions
     vertices = np.asarray(mesh.vertices)
     vertices[:, :2] += [optimal_tx, optimal_ty]
     mesh.vertices = o3d.utility.Vector3dVector(vertices)
 
-    # Transformation matrix for the optimal parameters
+    # Return the mesh with the transformation applied
     transformation_matrix = np.eye(4)
     transformation_matrix[:3, :3] = rotation_matrix
     transformation_matrix[:3, 3] = [optimal_tx, optimal_ty, 0]
