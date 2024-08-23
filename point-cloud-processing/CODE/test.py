@@ -1,13 +1,20 @@
+# Libraries for API requests and data processing
 import logging
 import time
+
+# Libraries for point cloud processing
 import numpy as np
 import open3d as o3d
-from fetcher import fetch_json, process_feature_list
-from mesh_processor import create_mesh_from_feature, apply_transformation
-from CODE.transformation_utils import  compute_z_offset, apply_z_offset, accumulate_transformations, create_center_based_transformation_matrix
-from geometry_utils import extract_2d_perimeter, extract_latlon_orientation_from_mesh, calculate_intersection_error, optimize_rotation_and_translation
-from CODE.visualization_utils import visualize_glb_and_combined_meshes, visualize_2d_perimeters, visualize_meshes_with_height_coloring
+
+ # Import the necessary functions from the custom modules
+from fetcher import process_feature_list
+from geolocation import extract_latlon_orientation_from_mesh
+from mesh_processor import load_and_transform_glb_model, align_mesh_centers, apply_optimal_params
+from geometry_utils import extract_2d_perimeter, optimize_rotation_and_translation
+from transformation_utils import compute_z_offset, apply_z_offset, accumulate_transformations, create_center_based_transformation_matrix
+from visualization_utils import visualize_meshes_with_height_coloring
 from icp_alignment import refine_alignment_with_icp
+
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,6 +28,14 @@ def load_optimal_params(file_path):
     """Load optimal parameters from a text file."""
     return np.loadtxt(file_path)
 
+def apply_transformation(mesh, transformation_matrix):
+    """Apply transformation matrix to the mesh."""
+    vertices = np.asarray(mesh.vertices)
+    transformed_vertices = (transformation_matrix[:3, :3] @ vertices.T).T + transformation_matrix[:3, 3]
+    mesh.vertices = o3d.utility.Vector3dVector(transformed_vertices)
+    mesh.compute_vertex_normals()
+    return mesh
+
 
 def main():
     start_time = time.time()
@@ -30,9 +45,9 @@ def main():
     # feature_ids = ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"]  # Pijlkruidstraat 11, 13 and 15
     feature_ids = ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"] # pijlkruid37-37.glb
     # feature_ids = ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"] # rietstraat31-33.glb
-    combined_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
+    bag_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
 
-    if combined_mesh:
+    if bag_mesh:
         # Load GLB model and apply transformation
         data_folder = "DATA/"
         # glb_dataset = "pijlkruidstraat11-13-15.glb"
@@ -75,11 +90,10 @@ def main():
         transformed_glb_mesh = o3d.io.read_triangle_mesh(glb_model_path)
         transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix_1)
         
-        visualize_glb_and_combined_meshes(combined_mesh, transformed_glb_mesh)
-        
-        # Visualize the results
-        visualize_meshes_with_height_coloring(combined_mesh, transformed_glb_mesh)
 
+        # Visualize the results
+        visualize_meshes_with_height_coloring(bag_mesh, transformed_glb_mesh, colormap_1='YlGnBu', colormap_2='YlOrRd')
+        
     logging.info(f"Elapsed time: {time.time() - start_time:.3f} seconds")
 
 if __name__ == "__main__":

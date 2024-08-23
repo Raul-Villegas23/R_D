@@ -3,7 +3,7 @@ import numpy as np
 import copy
 import logging
 
-def refine_alignment_with_icp(source_mesh, target_mesh, threshold=2.0, initial_max_iterations=50, max_iterations_limit=5000, convergence_threshold=1e-4, sample_points=10000):
+def refine_alignment_with_icp(source_mesh, target_mesh, threshold=1.0, initial_max_iterations=50, max_iterations_limit=5000, convergence_threshold=1e-4, sample_points=10000):
     """
     Refines the alignment of a source mesh to a target mesh using Iterative Closest Point (ICP) registration.
 
@@ -35,7 +35,6 @@ def refine_alignment_with_icp(source_mesh, target_mesh, threshold=2.0, initial_m
 
     # Perform ICP registration with dynamic iteration control
     for max_iterations in range(initial_max_iterations, max_iterations_limit + 1, 50):
-        logging.info(f"Performing ICP with max_iterations={max_iterations}...")
         reg_p2p = o3d.pipelines.registration.registration_icp(
             source_point_cloud, target_point_cloud, threshold,
             last_transformation,
@@ -44,10 +43,9 @@ def refine_alignment_with_icp(source_mesh, target_mesh, threshold=2.0, initial_m
         )
 
         transformation_change = np.linalg.norm(reg_p2p.transformation - last_transformation)
-        logging.info(f"Transformation change: {transformation_change:.6f}")
 
         if transformation_change < convergence_threshold:
-            logging.info(f"ICP converged with {max_iterations} iterations, final transformation change: {transformation_change:.6f}")
+            logging.info(f"ICP converged with {max_iterations} iterations.")
             source.transform(reg_p2p.transformation)
             logging.info(f"Final registration fitness: {reg_p2p.fitness}, RMSE: {reg_p2p.inlier_rmse}")
             return source, reg_p2p.transformation

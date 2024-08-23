@@ -50,7 +50,7 @@ def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
     plt.tight_layout(rect=[0, 0, 0.75, 1])  # Adjust layout to make room for the legend
     plt.show()
 
-def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='summer', colormap_2='winter'):
+def visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlGnBu', colormap_2='YlOrRd'):
 
     def color_mesh_by_height(mesh, colormap_name):
         vertices = np.asarray(mesh.vertices)
@@ -63,12 +63,12 @@ def visualize_meshes_with_height_coloring(combined_mesh, glb_mesh, colormap_1='s
         return mesh
 
     # Color a copy of the meshes based on height with different colormaps
-    combined_mesh_colored = color_mesh_by_height(combined_mesh, colormap_1)
+    bag_mesh_colored = color_mesh_by_height(bag_mesh, colormap_1)
     glb_mesh_colored = color_mesh_by_height(glb_mesh, colormap_2)
 
     # Visualize the meshes using Open3D
     o3d.visualization.draw_geometries(
-        [combined_mesh_colored, glb_mesh_colored],
+        [bag_mesh_colored, glb_mesh_colored],
         window_name="3D BAG and GLB Meshes",
         width=800,
         height=600,

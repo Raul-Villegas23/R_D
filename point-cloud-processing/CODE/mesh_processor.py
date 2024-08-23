@@ -54,6 +54,7 @@ def create_mesh_from_feature(feature):
                                 # print(f"Triangle {triangle_count} (LoD {max_lod}): [{boundary[0]}, {boundary[i]}, {boundary[i + 1]}]")
 
             mesh.triangles = o3d.utility.Vector3iVector(mesh.triangles)
+            mesh.compute_vertex_normals()
             # print(f"Total number of triangles created: {triangle_count}")
             return mesh, scale, translate
         else:
@@ -63,31 +64,32 @@ def create_mesh_from_feature(feature):
         logging.error("No vertices found in the feature data.")
         return None, None, None
 
-def load_and_transform_glb_model(file_path, translate):
+def load_and_transform_glb_model(file_path, translate, enable_post_processing=False):
     """Load and transform a GLB model."""
-    mesh = o3d.io.read_triangle_mesh(file_path, enable_post_processing= True) # Load the GLB model without any pre-processing (False) , True for pre-processing
+    # Load the GLB model with or without post-processing
+    mesh = o3d.io.read_triangle_mesh(file_path, enable_post_processing=enable_post_processing)
 
     if not mesh.has_vertices() or not mesh.has_triangles():
         logging.error("The GLB model has no vertices or triangles.")
         return None, None
-       
-    # Manually center the mesh using its bounding box center as the origin
-    bbox = mesh.get_axis_aligned_bounding_box()
-    mesh_center = bbox.get_center()
-    mesh.translate(-mesh_center)
+    
+    # If post-processing is enabled, manually center the mesh using its bounding box center
+    if enable_post_processing:
+        bbox = mesh.get_axis_aligned_bounding_box()
+        mesh_center = bbox.get_center()
+        mesh.translate(-mesh_center)
 
     # Transformation matrix to convert the GLB model to the right-handed coordinate system
-    # Given that the GLB-model is in the left-handed coordinate system (Y-up, Z-forward, X-right)
     transformation_matrix = np.array([
         [-1, 0, 0, 0],  # Flip X-axis
         [0, 0, 1, 0],   # Swap Z and Y axes
         [0, 1, 0, 0],   # Swap Y and Z axes
         [0, 0, 0, 1]    # Homogeneous coordinate
     ])
-
+    
     # Translation matrix as a homogeneous transformation
     translation_matrix = np.eye(4)
-    translation_matrix[:3, 3] = translate # Translate the GLB model to the 3DBAG origin (extracted from the feature data)
+    translation_matrix[:3, 3] = translate  # Translate the GLB model to the 3DBAG origin
 
     # Combine the rotation and translation
     combined_transformation = translation_matrix @ transformation_matrix
@@ -95,13 +97,13 @@ def load_and_transform_glb_model(file_path, translate):
     # Apply the combined transformation to the mesh
     mesh.transform(combined_transformation)
 
-
-    # Recompute vertex normals after transformation
-    # mesh.compute_vertex_normals()
-    # mesh.compute_triangle_normals()
+    # Recompute vertex normals after transformation if necessary
+    mesh.compute_vertex_normals()
+    mesh.compute_triangle_normals()
 
     # Return the transformed mesh and the transformation matrix used
     return mesh, combined_transformation
+
 
 
 def align_mesh_centers(mesh1, mesh2):
