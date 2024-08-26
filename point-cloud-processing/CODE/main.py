@@ -66,7 +66,7 @@ def main():
             # Extract the latitude, longitude, and orientation from the GLB mesh vertices using the reference system
             lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
             logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Orientation: {orientation:.5f} degrees")
-            get
+
             # Accumulate the transformations to get the final transformation matrix
             final_transformation_matrix = accumulate_transformations(transformations)
             logging.info(f"Final transformation matrix:\n{final_transformation_matrix}")
