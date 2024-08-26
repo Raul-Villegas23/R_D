@@ -94,6 +94,7 @@ def main():
         logging.info(f"Processing GLB dataset {glb_dataset}")
         process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id)
         print_memory_usage(f"after processing {glb_dataset}")
+        print("\n")
 
     logging.info(f"Total elapsed time: {time.time() - start_time:.3f} seconds")
     print_memory_usage("end")

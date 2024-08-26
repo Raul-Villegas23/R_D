@@ -37,7 +37,7 @@ def process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id
         logging.info(f"Loaded transformation matrix:\n{transformation_matrix}")
 
         glb_model_path = data_folder + glb_dataset
-        transformed_glb_mesh = o3d.io.read_triangle_mesh(glb_model_path, True)
+        transformed_glb_mesh = o3d.io.read_triangle_mesh(glb_model_path, False)
 
         if not transformed_glb_mesh.has_vertices() or not transformed_glb_mesh.has_triangles():
             logging.error("The GLB model has no vertices or triangles.")

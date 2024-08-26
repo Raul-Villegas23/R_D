@@ -35,8 +35,8 @@ def extract_latlon_orientation_from_mesh(mesh, reference_system):
     transformer = Transformer.from_crs(f"EPSG:{epsg_code}", "EPSG:4326", always_xy=True)
     latlon_vertices = np.array([transformer.transform(x, y) for x, y, z in vertices])
     centroid = np.mean(latlon_vertices, axis=0)
-    hull = ConvexHull(latlon_vertices)
-    hull_vertices = latlon_vertices[hull.vertices]
+    hull = ConvexHull(vertices) # Compute the convex hull of the vertices (latlon_vertices)
+    hull_vertices = vertices[hull.vertices] # Latlon_vertices of the convex hull
     longest_edge = max(((hull_vertices[i], hull_vertices[j]) for i in range(len(hull_vertices)) for j in range(i+1, len(hull_vertices))), key=lambda edge: np.linalg.norm(edge[1] - edge[0]))
     orientation_angle = (np.degrees(np.arctan2(longest_edge[1][1] - longest_edge[0][1], longest_edge[1][0] - longest_edge[0][0])) + 360) % 360
 
