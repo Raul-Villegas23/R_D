@@ -45,7 +45,11 @@ def refine_alignment_with_icp(source_mesh, target_mesh, threshold=2.0, max_itera
 
     source_point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
     target_point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-    o3d.visualization.draw_geometries([source_point_cloud, target_point_cloud])
+    
+    # Paint the source point cloud
+    # source_point_cloud.paint_uniform_color([1, 0.706, 0])
+    # target_point_cloud.paint_uniform_color([0, 0.651, 0.929])
+    # o3d.visualization.draw_geometries([source_point_cloud, target_point_cloud])
 
     if initial_transformation is None:
         initial_transformation = np.identity(4)
