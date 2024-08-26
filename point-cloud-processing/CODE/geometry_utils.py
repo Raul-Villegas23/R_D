@@ -2,7 +2,6 @@ import numpy as np
 from scipy.spatial import ConvexHull
 from shapely.geometry import Polygon
 from shapely.affinity import rotate
-from pyproj import Transformer
 from scipy.optimize import minimize
 
 def extract_2d_perimeter(mesh):

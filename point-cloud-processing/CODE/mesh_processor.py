@@ -5,6 +5,8 @@ import logging
 
 def create_mesh_from_feature(feature):
     """Create a mesh object using only the highest LoD from feature data."""
+
+    # Extract vertices from the feature data and apply the transformation if available 
     if 'vertices' in feature['feature']:
         vertices = np.array(feature['feature']['vertices'])
         transform = feature['metadata'].get('transform', {})
@@ -12,9 +14,11 @@ def create_mesh_from_feature(feature):
         translate = np.array(transform.get('translate', [0, 0, 0]))
         vertices = vertices * scale + translate
 
+        # Create a triangle mesh object with the vertices using Open3D
         mesh = o3d.geometry.TriangleMesh()
         mesh.vertices = o3d.utility.Vector3dVector(vertices)
 
+        # Extract the CityObjects and find the highest LoD geometry
         city_objects = feature['feature'].get('CityObjects', {})
         max_lod = None
         max_lod_geom = None
@@ -29,7 +33,6 @@ def create_mesh_from_feature(feature):
 
         if max_lod_geom:
             print(f"Using highest LoD: {max_lod}")
-
             triangle_count = 0  # To keep track of the number of triangles created
 
             for boundary_group in max_lod_geom.get('boundaries', []):
@@ -37,25 +40,20 @@ def create_mesh_from_feature(feature):
                 for boundary in boundary_group:
                     if isinstance(boundary[0], list):  # Check if the boundary is nested
                         for sub_boundary in boundary:
-                            # print(f"  Sub-boundary: {sub_boundary}")  # Debugging: Print the sub-boundary structure
                             if len(sub_boundary) >= 3:  # Ensure there are at least 3 points to form a triangle
                                 for i in range(1, len(sub_boundary) - 1):
                                     mesh.triangles.append([sub_boundary[0], sub_boundary[i], sub_boundary[i + 1]])
-                                    triangle_count += 1
-                                    # Print the triangle that is being added
-                                    # print(f"Triangle {triangle_count} (LoD {max_lod}): [{sub_boundary[0]}, {sub_boundary[i]}, {sub_boundary[i + 1]}]")
+                                    triangle_count += 1 
                     else:
-                        # print(f"  Boundary: {boundary}")  # Debugging: Print the boundary structure
                         if len(boundary) >= 3:  # Ensure there are at least 3 points to form a triangle
                             for i in range(1, len(boundary) - 1):
                                 mesh.triangles.append([boundary[0], boundary[i], boundary[i + 1]])
                                 triangle_count += 1
-                                # Print the triangle that is being added
-                                # print(f"Triangle {triangle_count} (LoD {max_lod}): [{boundary[0]}, {boundary[i]}, {boundary[i + 1]}]")
-
+                                
+            # Convert the triangles to a Vector3iVector for Open3D compatibility and compute vertex normals
             mesh.triangles = o3d.utility.Vector3iVector(mesh.triangles)
             mesh.compute_vertex_normals()
-            # print(f"Total number of triangles created: {triangle_count}")
+
             return mesh, scale, translate
         else:
             logging.error("No geometry data found for the highest LoD.")
@@ -86,7 +84,6 @@ def load_and_transform_glb_model(file_path, translate, enable_post_processing=Fa
         [0, 1, 0, 0],   # Swap Y and Z axes
         [0, 0, 0, 1]    # Homogeneous coordinate
     ])
-    
     # Translation matrix as a homogeneous transformation
     translation_matrix = np.eye(4)
     translation_matrix[:3, 3] = translate  # Translate the GLB model to the 3DBAG origin
@@ -99,8 +96,7 @@ def load_and_transform_glb_model(file_path, translate, enable_post_processing=Fa
 
     # Recompute vertex normals after transformation if necessary
     mesh.compute_vertex_normals()
-    mesh.compute_triangle_normals()
-
+    
     # Return the transformed mesh and the transformation matrix used
     return mesh, combined_transformation
 
@@ -133,5 +129,5 @@ def apply_optimal_params(mesh, optimal_angle, optimal_tx, optimal_ty):
     transformation_matrix = np.eye(4)
     transformation_matrix[:3, :3] = rotation_matrix
     transformation_matrix[:3, 3] = [optimal_tx, optimal_ty, 0]
-    
+
     return mesh

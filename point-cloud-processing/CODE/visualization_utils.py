@@ -4,21 +4,20 @@ import matplotlib.pyplot as plt
 from geometry_utils import calculate_centroid, compute_orientation
 
 
-def visualize_2d_perimeters(perimeter1, perimeter2, perimeter3):
+def visualize_2d_perimeters(perimeter1, perimeter2):
     """Visualize three 2D perimeters, their centroids, orientations, and longest edges using Matplotlib."""
     fig, ax = plt.subplots()
     ax.plot(perimeter1[:, 0], perimeter1[:, 1], 'r-', label='3D BAG Mesh Perimeter')
     ax.plot(perimeter2[:, 0], perimeter2[:, 1], 'b-', label='GLB Mesh Perimeter')
-    ax.plot(perimeter3[:, 0], perimeter3[:, 1], 'g--', label='Non-aligned Perimeter')  # Dashed lines for the third perimeter
-
+    
     # Calculate and plot centroids
     centroid1 = calculate_centroid(perimeter1)
     centroid2 = calculate_centroid(perimeter2)
-    centroid3 = calculate_centroid(perimeter3)
+
     
     ax.plot(centroid1[0], centroid1[1], 'ro', label='Centroid 3D BAG Mesh')
     ax.plot(centroid2[0], centroid2[1], 'bo', label='Centroid GLB Mesh')
-    ax.plot(centroid3[0], centroid3[1], 'go', label='Centroid Non-aligned')
+
 
     # Compute and display orientations
     orientation2, longest_edge2 = compute_orientation(perimeter2)

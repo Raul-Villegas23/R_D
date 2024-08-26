@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def compute_z_offset(combined_mesh, glb_mesh):
     """
     Compute the Z offset needed to align the floor of the GLB mesh with the combined mesh.

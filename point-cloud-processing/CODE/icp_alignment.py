@@ -3,7 +3,9 @@ import numpy as np
 import copy
 import logging
 
-def refine_alignment_with_icp(source_mesh, target_mesh, threshold=1.0, initial_max_iterations=50, max_iterations_limit=5000, convergence_threshold=1e-4, sample_points=10000):
+
+
+def refine_alignment_with_icp(source_mesh, target_mesh, threshold=2.0, initial_max_iterations=50, max_iterations_limit=5000, convergence_threshold=1e-4, sample_points=10000):
     """
     Refines the alignment of a source mesh to a target mesh using Iterative Closest Point (ICP) registration.
 
@@ -30,10 +32,11 @@ def refine_alignment_with_icp(source_mesh, target_mesh, threshold=1.0, initial_m
     logging.info(f"Sampling {sample_points} points from source and target meshes.")
     source_point_cloud = source.sample_points_uniformly(number_of_points=sample_points)
     target_point_cloud = target.sample_points_uniformly(number_of_points=sample_points)
+    o3d.visualization.draw_geometries([source_point_cloud, target_point_cloud])
+    # Initialize transformation matrix for ICP
+    last_transformation = np.identity(4) # Identity matrix
 
-    last_transformation = np.identity(4)
-
-    # Perform ICP registration with dynamic iteration control
+    # Perform ICP registration with dynamic iteration control based on convergence threshold and maximum iterations
     for max_iterations in range(initial_max_iterations, max_iterations_limit + 1, 50):
         reg_p2p = o3d.pipelines.registration.registration_icp(
             source_point_cloud, target_point_cloud, threshold,
@@ -41,13 +44,14 @@ def refine_alignment_with_icp(source_mesh, target_mesh, threshold=1.0, initial_m
             o3d.pipelines.registration.TransformationEstimationPointToPoint(),
             o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iterations)
         )
-
+        # Check for convergence based on transformation change threshold
         transformation_change = np.linalg.norm(reg_p2p.transformation - last_transformation)
 
         if transformation_change < convergence_threshold:
             logging.info(f"ICP converged with {max_iterations} iterations.")
             source.transform(reg_p2p.transformation)
             logging.info(f"Final registration fitness: {reg_p2p.fitness}, RMSE: {reg_p2p.inlier_rmse}")
+
             return source, reg_p2p.transformation
 
         last_transformation = reg_p2p.transformation
