@@ -69,11 +69,8 @@ def visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlGnBu
     o3d.visualization.draw_geometries(
         [bag_mesh_colored, glb_mesh_colored],
         window_name="3D BAG and GLB Meshes",
-        width=800,
-        height=600,
+        width=1000,
+        height=800,
         left=50,
         top=50,
-        point_show_normal=False,
-        mesh_show_wireframe=False,
-        mesh_show_back_face=False,
     )

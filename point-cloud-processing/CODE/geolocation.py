@@ -39,4 +39,5 @@ def extract_latlon_orientation_from_mesh(mesh, reference_system):
     hull_vertices = latlon_vertices[hull.vertices]
     longest_edge = max(((hull_vertices[i], hull_vertices[j]) for i in range(len(hull_vertices)) for j in range(i+1, len(hull_vertices))), key=lambda edge: np.linalg.norm(edge[1] - edge[0]))
     orientation_angle = (np.degrees(np.arctan2(longest_edge[1][1] - longest_edge[0][1], longest_edge[1][0] - longest_edge[0][0])) + 360) % 360
+
     return centroid[1], centroid[0], orientation_angle

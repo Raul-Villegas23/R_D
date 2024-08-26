@@ -1,5 +1,7 @@
 import requests
 import logging
+import psutil
+
 import open3d as o3d
 from mesh_processor import create_mesh_from_feature
 
@@ -40,3 +42,8 @@ def process_feature_list(collections_url, collection_id, feature_ids):
     else:
         logging.error("No meshes to visualize.")
         return None, None, None, None
+    
+def print_memory_usage(step):
+    process = psutil.Process()
+    mem_info = process.memory_info()
+    logging.info(f"Memory usage at {step}: {mem_info.rss / 1024 ** 2:.2f} MB")

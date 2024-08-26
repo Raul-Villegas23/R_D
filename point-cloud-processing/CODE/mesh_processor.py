@@ -77,6 +77,8 @@ def load_and_transform_glb_model(file_path, translate, enable_post_processing=Fa
         mesh_center = bbox.get_center()
         mesh.translate(-mesh_center)
 
+    # Initialize the transformation matrix
+    transformation_matrix = np.eye(4)
     # Transformation matrix to convert the GLB model to the right-handed coordinate system
     transformation_matrix = np.array([
         [-1, 0, 0, 0],  # Flip X-axis
@@ -84,6 +86,7 @@ def load_and_transform_glb_model(file_path, translate, enable_post_processing=Fa
         [0, 1, 0, 0],   # Swap Y and Z axes
         [0, 0, 0, 1]    # Homogeneous coordinate
     ])
+
     # Translation matrix as a homogeneous transformation
     translation_matrix = np.eye(4)
     translation_matrix[:3, 3] = translate  # Translate the GLB model to the 3DBAG origin
