@@ -68,8 +68,8 @@ def process_glb_and_bag(
             with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
                 file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
 
-            del bag_mesh, glb_mesh, transformations
-            gc.collect()
+            del bag_mesh, glb_mesh, transformations # Delete the meshes and transformations to free up memory
+            gc.collect() # Explicitly call garbage collection
 
 def main() -> None:
     start_time = time.time()
@@ -93,6 +93,7 @@ def main() -> None:
         }
     ]
 
+    # Process each task in the list with the corresponding feature IDs and GLB dataset
     for task in tasks:
         feature_ids = task["feature_ids"]
         glb_dataset = task["glb_dataset"]
