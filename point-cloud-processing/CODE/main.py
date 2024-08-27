@@ -15,7 +15,6 @@ from mesh_processor import load_and_transform_glb_model
 from transformation_utils import accumulate_transformations, compute_z_offset, apply_z_offset
 from visualization_utils import visualize_meshes_with_height_coloring
 from icp_alignment import refine_alignment_with_icp
-
 # Typing import
 from numpy.typing import NDArray
 
@@ -45,7 +44,8 @@ def process_glb_and_bag(
         if glb_mesh:
             transformations: List[NDArray[np.float64]] = [initial_transformation]
 
-            glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, bag_mesh)
+            glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, bag_mesh, multiple_passes=False)
+            # glb_mesh, icp_transformation = refine_alignment_with_icp_combined(glb_mesh, bag_mesh, initial_transformation=initial_transformation)
             transformations.append(icp_transformation)
 
             z_offset = compute_z_offset(bag_mesh, glb_mesh)
@@ -67,7 +67,8 @@ def process_glb_and_bag(
             np.savetxt(transformation_matrix_filename, final_transformation_matrix)
             with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
                 file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
-
+            
+            # visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
             del bag_mesh, glb_mesh, transformations # Delete the meshes and transformations to free up memory
             gc.collect() # Explicitly call garbage collection
 

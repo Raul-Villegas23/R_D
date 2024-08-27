@@ -52,7 +52,7 @@ def create_mesh_from_feature(feature):
                                 
             # Convert the triangles to a Vector3iVector for Open3D compatibility and compute vertex normals
             mesh.triangles = o3d.utility.Vector3iVector(mesh.triangles)
-            mesh.compute_vertex_normals()
+            # mesh.compute_vertex_normals()
 
             return mesh, scale, translate
         else:
@@ -98,7 +98,7 @@ def load_and_transform_glb_model(file_path, translate, enable_post_processing=Fa
     mesh.transform(combined_transformation)
 
     # Recompute vertex normals after transformation if necessary
-    mesh.compute_vertex_normals()
+    # mesh.compute_vertex_normals()
     
     # Return the transformed mesh and the transformation matrix used
     return mesh, combined_transformation

@@ -3,38 +3,26 @@ import numpy as np
 import copy
 import logging
 
-def preprocess_point_cloud(mesh, voxel_size):
-    """
-    Converts a mesh to a point cloud, then downsamples, estimates normals, and computes FPFH features.
-    
-    Parameters:
-    - mesh: The input TriangleMesh.
-    - voxel_size: The voxel size for downsampling.
-    
-    Returns:
-    - downsampled_pcd: The downsampled point cloud.
-    - fpfh: The FPFH features of the downsampled point cloud.
-    """
-    print(":: Converting mesh to point cloud.")
-    pcd = mesh.sample_points_uniformly(number_of_points=100000)
-
-    print(":: Downsampling with a voxel size of %.3f." % voxel_size)
-    downsampled_pcd = pcd.voxel_down_sample(voxel_size)
-
-    print(":: Estimating normals.")
-    downsampled_pcd.estimate_normals(
-        o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size * 2.0, max_nn=30))
-
-    print(":: Computing FPFH features.")
-    fpfh = o3d.pipelines.registration.compute_fpfh_feature(
-        downsampled_pcd,
-        o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size * 5.0, max_nn=100))
-    
-    return downsampled_pcd, fpfh
-
-
 def refine_alignment_with_icp(source_mesh, target_mesh, threshold=2.0, max_iterations=1000, convergence_threshold=1e-4, sample_points=10000, initial_transformation=None, multiple_passes=True):
+    """
+    Refines the alignment of a source mesh to a target mesh using Iterative Closest Point (ICP) registration.
+    Parameters:
+    - source_mesh: The source mesh to be aligned.
+    - target_mesh: The target mesh to align to.
+    - threshold: The distance threshold for correspondences.
+    - max_iterations: The maximum number of iterations for ICP.
+    - convergence_threshold: The convergence threshold for ICP.
+    - sample_points: The number of points to sample from the meshes
+    - initial_transformation: Initial transformation matrix for the ICP process.
+    - multiple_passes: Whether to perform multiple ICP passes with decreasing thresholds.
+
+    Returns:
+    - source: The transformed source mesh after alignment.
+    - final_transformation: The final transformation matrix used for alignment.
+    """
+
     logging.info("Starting ICP registration...")
+    
 
     source = copy.deepcopy(source_mesh)
     target = copy.deepcopy(target_mesh)
@@ -45,11 +33,6 @@ def refine_alignment_with_icp(source_mesh, target_mesh, threshold=2.0, max_itera
 
     source_point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
     target_point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-    
-    # Paint the source point cloud
-    # source_point_cloud.paint_uniform_color([1, 0.706, 0])
-    # target_point_cloud.paint_uniform_color([0, 0.651, 0.929])
-    # o3d.visualization.draw_geometries([source_point_cloud, target_point_cloud])
 
     if initial_transformation is None:
         initial_transformation = np.identity(4)
