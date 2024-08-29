@@ -77,7 +77,7 @@ def process_glb_and_bag(
             np.savetxt(transformation_matrix_filename, final_transformation_matrix)
 
             # Visualize the BAG and GLB meshes with height coloring for debugging purposes
-            # visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
+            visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
 
             del bag_mesh, glb_mesh, transformations  # Delete the meshes and transformations to free up memory
             gc.collect()  # Explicitly call garbage collection

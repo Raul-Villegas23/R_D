@@ -23,13 +23,13 @@ def apply_transformation(mesh, transformation_matrix):
     vertices = np.asarray(mesh.vertices)
     transformed_vertices = (transformation_matrix[:3, :3] @ vertices.T).T + transformation_matrix[:3, 3]
     mesh.vertices = o3d.utility.Vector3dVector(transformed_vertices)
-    mesh.compute_vertex_normals()
+    # mesh.compute_vertex_normals()
     return mesh
 
 def process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id):
     """Process a single GLB and BAG feature IDs."""
     bag_mesh, scale, translate, reference_system = process_feature_list(collections_url, collection_id, feature_ids)
-    bag_mesh.compute_vertex_normals()
+    # bag_mesh.compute_vertex_normals()
 
     if bag_mesh:
         data_folder = "DATA/"
@@ -55,7 +55,7 @@ def process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id
 
         bag_perimeter = extract_2d_perimeter(bag_mesh)
         glb_perimeter = extract_2d_perimeter(transformed_glb_mesh)
-        # visualize_2d_perimeters(bag_perimeter, glb_perimeter)
+        visualize_2d_perimeters(bag_perimeter, glb_perimeter)
 
 def main():
     start_time = time.time()
