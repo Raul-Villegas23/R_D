@@ -8,7 +8,7 @@ def refine_alignment_with_icp(
     source_mesh: o3d.geometry.TriangleMesh, 
     target_mesh: o3d.geometry.TriangleMesh, 
     threshold: float = 2.0, 
-    max_iterations: int = 1000, 
+    max_iterations: int = 200, 
     convergence_threshold: float = 1e-4, 
     sample_points: int = 10000, 
     initial_transformation: Optional[np.ndarray] = None, 
@@ -36,8 +36,9 @@ def refine_alignment_with_icp(
     - final_transformation: The final transformation matrix used for alignment.
     """
 
-    def perform_icp(threshold: float) -> Tuple[o3d.geometry.TriangleMesh, np.ndarray, float, float]:
+    def perform_icp(threshold: float) -> Tuple[o3d.geometry.TriangleMesh, np.ndarray, float, float, int]:
         final_transformation = initial_transformation if initial_transformation is not None else np.identity(4)
+        total_iterations = 0
 
         if multiple_passes:
             for i, factor in enumerate([1.0, 0.5, 0.25], start=1):
@@ -49,6 +50,14 @@ def refine_alignment_with_icp(
                     o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iterations, relative_fitness=convergence_threshold)
                 )
                 final_transformation = reg_p2p.transformation
+
+                # Estimate used iterations based on fitness convergence
+                if reg_p2p.fitness >= fitness_threshold:
+                    used_iterations = int(max_iterations * reg_p2p.fitness)
+                else:
+                    used_iterations = max_iterations  # Assume max_iterations if not converged
+
+                total_iterations += used_iterations
                 logging.info(f"Pass {i} - Fitness: {reg_p2p.fitness}, RMSE: {reg_p2p.inlier_rmse}")
         else:
             reg_p2p = o3d.pipelines.registration.registration_icp(
@@ -57,9 +66,16 @@ def refine_alignment_with_icp(
                 o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iterations, relative_fitness=convergence_threshold)
             )
             final_transformation = reg_p2p.transformation
+
+            if reg_p2p.fitness >= fitness_threshold:
+                used_iterations = int(max_iterations * reg_p2p.fitness)
+            else:
+                used_iterations = max_iterations  # Assume max_iterations if not converged
+
+            total_iterations += used_iterations
             logging.info(f"Single Pass ICP - Fitness: {reg_p2p.fitness}, RMSE: {reg_p2p.inlier_rmse}")
 
-        return source, final_transformation, reg_p2p.fitness, reg_p2p.inlier_rmse
+        return source, final_transformation, reg_p2p.fitness, reg_p2p.inlier_rmse, total_iterations
 
     logging.info("Starting ICP registration...")
     
@@ -76,13 +92,14 @@ def refine_alignment_with_icp(
     target_point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
 
     # Perform ICP registration with the initial threshold
-    source, final_transformation, fitness, rmse = perform_icp(threshold)
+    source, final_transformation, fitness, rmse, iterations = perform_icp(threshold)
 
     # Check if the fitness and RMSE meet the thresholds
     if fitness < fitness_threshold or rmse > rmse_threshold:
         logging.warning("Initial ICP did not meet the fitness or RMSE thresholds. Retrying with doubled threshold...")
         # Retry the ICP process with doubled threshold
-        source, final_transformation, fitness, rmse = perform_icp(threshold * 2)
+        source, final_transformation, fitness, rmse, retry_iterations = perform_icp(threshold * 2)
+        iterations += retry_iterations
 
         # Check if the thresholds are met after the second attempt
         if fitness < fitness_threshold or rmse > rmse_threshold:
@@ -92,6 +109,6 @@ def refine_alignment_with_icp(
     source.transform(final_transformation)
 
     logging.info("ICP registration completed.")
-    logging.info(f"Final Fitness: {fitness}, Final RMSE: {rmse}")
+    logging.info(f"Final Fitness: {fitness}, Final RMSE: {rmse}, Total Iterations: {iterations}")
 
     return source, final_transformation
