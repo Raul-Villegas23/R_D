@@ -11,7 +11,7 @@ import open3d as o3d
 # Import the necessary functions from the custom modules
 from fetcher import process_feature_list, print_memory_usage
 from geolocation import extract_latlon_orientation_from_mesh
-from mesh_processor import load_and_transform_glb_model
+from mesh_processor import load_and_transform_glb_model, align_mesh_centers
 from transformation_utils import accumulate_transformations, compute_z_offset, apply_z_offset
 from visualization_utils import visualize_meshes_with_height_coloring
 from icp_alignment import refine_alignment_with_icp
@@ -44,7 +44,7 @@ def process_glb_and_bag(
         if glb_mesh:
             transformations: List[NDArray[np.float64]] = [initial_transformation]
 
-            glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, bag_mesh, multiple_passes=False)
+            glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, bag_mesh, multiple_passes=True)
             # glb_mesh, icp_transformation = refine_alignment_with_icp_combined(glb_mesh, bag_mesh, initial_transformation=initial_transformation)
             transformations.append(icp_transformation)
 
@@ -57,18 +57,22 @@ def process_glb_and_bag(
                 [0, 0, 0, 1]
             ], dtype=np.float64))
 
+            # Extract the latitude, longitude, and orientation from the transformed GLB mesh
             lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
             logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Orientation: {orientation:.5f} degrees")
+            with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
+                file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
 
+            # Accumulate the transformations and save the final transformation matrix to a text file
             final_transformation_matrix = accumulate_transformations(transformations)
-            logging.info(f"Final transformation matrix:\n{final_transformation_matrix}")
+            logging.info(f"\nFinal transformation matrix:\n{final_transformation_matrix}")
 
             transformation_matrix_filename = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
             np.savetxt(transformation_matrix_filename, final_transformation_matrix)
-            with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
-                file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nOrientation: {orientation:.5f}")
-            
-            # visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
+
+            # Visualize the BAG and GLB meshes with height coloring for debugging purposes
+            visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
+
             del bag_mesh, glb_mesh, transformations # Delete the meshes and transformations to free up memory
             gc.collect() # Explicitly call garbage collection
 
