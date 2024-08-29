@@ -136,3 +136,34 @@ def create_center_based_transformation_matrix(
     )
     
     return combined_transformation_matrix
+
+def calculate_rotation_z(matrix: np.ndarray) -> float:
+    """
+    Calculate the rotation around the Z-axis from a 4x4 transformation matrix.
+
+    Parameters:
+    - matrix: A 4x4 numpy array representing the transformation matrix.
+
+    Returns:
+    - Rotation angle around the Z-axis in degrees.
+    """
+    if matrix.shape != (4, 4):
+        raise ValueError("Input matrix must be a 4x4 transformation matrix.")
+
+    # Extract the elements needed for calculating the rotation around the Z-axis
+    r11 = matrix[0, 0]
+    r21 = matrix[1, 0]
+
+    # Calculate the rotation angle in radians
+    theta_z = np.arctan2(r21, r11)
+
+    # Normalize the angle to be within [0, 2*pi] radians
+    theta_z = (theta_z + 2 * np.pi) % (2 * np.pi)
+
+    # Convert the angle from radians to degrees
+    theta_z_degrees = np.degrees(theta_z)
+
+    # Normalize the angle to be within [0, 360] degrees
+    theta_z_degrees = (theta_z_degrees + 360) % 360
+
+    return theta_z

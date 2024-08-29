@@ -12,7 +12,7 @@ import open3d as o3d
 from fetcher import process_feature_list, print_memory_usage
 from geolocation import extract_latlon_orientation_from_mesh
 from mesh_processor import load_and_transform_glb_model, align_mesh_centers
-from transformation_utils import accumulate_transformations, compute_z_offset, apply_z_offset
+from transformation_utils import accumulate_transformations, compute_z_offset, apply_z_offset, calculate_rotation_z
 from visualization_utils import visualize_meshes_with_height_coloring
 from icp_alignment import refine_alignment_with_icp, refine_alignment_with_multipass_icp
 # Typing import
@@ -72,6 +72,10 @@ def process_glb_and_bag(
             # Accumulate the transformations and save the final transformation matrix to a text file
             final_transformation_matrix = accumulate_transformations(transformations)
             logging.info(f"\nFinal transformation matrix:\n{final_transformation_matrix}")
+
+            # Calculate the rotation around the Z-axis to align the GLB model with the BAG model
+            optimal_angle = calculate_rotation_z(final_transformation_matrix)
+            logging.info(f"Optimal rotation angle around Z-axis: {optimal_angle:.5f} radians")
 
             transformation_matrix_filename = f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt"
             np.savetxt(transformation_matrix_filename, final_transformation_matrix)
