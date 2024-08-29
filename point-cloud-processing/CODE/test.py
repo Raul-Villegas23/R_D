@@ -46,7 +46,8 @@ def process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id
 
         transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix)
 
-        visualize_meshes_with_height_coloring(bag_mesh, transformed_glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
+        # Visualize the BAG and transformed GLB meshes with height coloring
+        visualize_meshes_with_height_coloring(bag_mesh, transformed_glb_mesh, colormap_1='YlGnBu_r', colormap_2='YlOrRd')
         
         # Save combined mesh to file with the name of the GLB dataset as a .ply file
         # o3d.io.write_triangle_mesh(f"RESULTS/{glb_dataset.split('.')[0]}.ply", bag_mesh + transformed_glb_mesh, print_progress=True)

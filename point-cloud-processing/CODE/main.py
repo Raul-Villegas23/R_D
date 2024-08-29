@@ -2,7 +2,7 @@
 import logging
 import time
 import gc
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 # Libraries for point cloud processing
 import numpy as np
@@ -14,7 +14,7 @@ from geolocation import extract_latlon_orientation_from_mesh
 from mesh_processor import load_and_transform_glb_model, align_mesh_centers
 from transformation_utils import accumulate_transformations, compute_z_offset, apply_z_offset
 from visualization_utils import visualize_meshes_with_height_coloring
-from icp_alignment import refine_alignment_with_icp
+from icp_alignment import refine_alignment_with_icp, refine_alignment_with_multipass_icp
 # Typing import
 from numpy.typing import NDArray
 
@@ -38,18 +38,24 @@ def process_glb_and_bag(
         data_folder = "DATA/"
         glb_model_path = data_folder + glb_dataset
 
-        # Load and transform the GLB model
+        # Load the glb model, translate it close to the 3dbag model and transform it to the same coordinate system
         glb_mesh, initial_transformation = load_and_transform_glb_model(glb_model_path, translate)
 
         if glb_mesh:
+            # Initialize the list of transformations with the initial transformation matrix from the GLB model
             transformations: List[NDArray[np.float64]] = [initial_transformation]
 
-            glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, bag_mesh, multiple_passes=True)
-            # glb_mesh, icp_transformation = refine_alignment_with_icp_combined(glb_mesh, bag_mesh, initial_transformation=initial_transformation)
+            # Use ICP to refine the alignment between the BAG and GLB meshes
+            glb_mesh, icp_transformation = refine_alignment_with_icp(glb_mesh, bag_mesh)
+
+            # Append the ICP transformation to the list of transformations
             transformations.append(icp_transformation)
 
+            # Fix the height offset between the BAG and GLB meshes
             z_offset = compute_z_offset(bag_mesh, glb_mesh)
             apply_z_offset(glb_mesh, z_offset)
+
+            # Append the z-offset transformation to the list of transformations
             transformations.append(np.array([
                 [1, 0, 0, 0],
                 [0, 1, 0, 0],
@@ -71,10 +77,10 @@ def process_glb_and_bag(
             np.savetxt(transformation_matrix_filename, final_transformation_matrix)
 
             # Visualize the BAG and GLB meshes with height coloring for debugging purposes
-            visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
+            # visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
 
-            del bag_mesh, glb_mesh, transformations # Delete the meshes and transformations to free up memory
-            gc.collect() # Explicitly call garbage collection
+            del bag_mesh, glb_mesh, transformations  # Delete the meshes and transformations to free up memory
+            gc.collect()  # Explicitly call garbage collection
 
 def main() -> None:
     start_time = time.time()
@@ -83,7 +89,7 @@ def main() -> None:
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
 
-    tasks: List[dict] = [
+    tasks: List[Dict[str, List[str]]] = [
         {
             "feature_ids": ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"],
             "glb_dataset": "pijlkruidstraat11-13-15.glb"

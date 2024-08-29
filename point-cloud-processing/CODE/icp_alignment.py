@@ -2,13 +2,71 @@ import open3d as o3d
 import numpy as np
 import copy
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
+import time
 
 def refine_alignment_with_icp(
     source_mesh: o3d.geometry.TriangleMesh, 
     target_mesh: o3d.geometry.TriangleMesh, 
     threshold: float = 2.0, 
-    max_iterations: int = 200, 
+    max_iterations: int = 1000, 
+    initial_transformation: Optional[np.ndarray] = None
+) -> Tuple[o3d.geometry.TriangleMesh, np.ndarray]:
+    """
+    Refines the alignment of a source mesh to a target mesh using basic Iterative Closest Point (ICP) registration.
+    
+    Parameters:
+    - source_mesh: The source mesh to be aligned.
+    - target_mesh: The target mesh to align to.
+    - threshold: The distance threshold for correspondences.
+    - max_iterations: The maximum number of iterations for ICP.
+    - initial_transformation: Initial transformation matrix for the ICP process.
+
+    Returns:
+    - source: The transformed source mesh after alignment.
+    - final_transformation: The final transformation matrix used for alignment.
+    """
+
+    logging.info("Starting basic ICP registration...")
+
+    # Step 1: Copy the source and target meshes to avoid modifying the originals
+    source = copy.deepcopy(source_mesh)
+    target = copy.deepcopy(target_mesh)
+
+    # Step 2: Sample points from the meshes
+    source_point_cloud = source.sample_points_uniformly(number_of_points=10000)
+    target_point_cloud = target.sample_points_uniformly(number_of_points=10000)
+
+    # Estimate normals
+    source_point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+    target_point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+
+    # Step 3: Set the initial transformation matrix
+    if initial_transformation is None:
+        initial_transformation = np.identity(4)
+
+    # Step 4: Perform ICP registration
+    reg_p2p = o3d.pipelines.registration.registration_icp(
+        source_point_cloud, target_point_cloud, threshold, initial_transformation,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+        o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iterations)
+    )
+
+    final_transformation = reg_p2p.transformation
+
+    # Step 5: Apply the final transformation to the source mesh
+    source.transform(final_transformation)
+
+    logging.info("ICP registration completed.")
+    logging.info(f"Final Fitness: {reg_p2p.fitness:.4f}, Final RMSE: {reg_p2p.inlier_rmse:.4f}")
+
+    return source, final_transformation
+
+def refine_alignment_with_multipass_icp(
+    source_mesh: o3d.geometry.TriangleMesh, 
+    target_mesh: o3d.geometry.TriangleMesh, 
+    threshold: float = 2.0, 
+    max_iterations: int = 1000, 
     convergence_threshold: float = 1e-4, 
     sample_points: int = 10000, 
     initial_transformation: Optional[np.ndarray] = None, 
