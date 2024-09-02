@@ -38,7 +38,7 @@ def process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id
         logging.info(f"Loaded transformation matrix:\n{transformation_matrix}")
 
         glb_model_path = data_folder + glb_dataset
-        transformed_glb_mesh = o3d.io.read_triangle_mesh(glb_model_path, enable_post_processing=False)
+        transformed_glb_mesh = o3d.io.read_triangle_mesh(glb_model_path, enable_post_processing=True)
 
         if not transformed_glb_mesh.has_vertices() or not transformed_glb_mesh.has_triangles():
             logging.error("The GLB model has no vertices or triangles.")
@@ -46,7 +46,7 @@ def process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id
 
         transformed_glb_mesh = apply_transformation(transformed_glb_mesh, transformation_matrix)
 
-        # Visualize the BAG and transformed GLB meshes with height coloring
+        # Visualize the BAG aqnd transformed GLB meshes with height coloring
         visualize_meshes_with_height_coloring(bag_mesh, transformed_glb_mesh, colormap_1='YlGnBu_r', colormap_2='YlOrRd')
         
         # Save combined mesh to file with the name of the GLB dataset as a .ply file
