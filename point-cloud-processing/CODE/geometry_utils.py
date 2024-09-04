@@ -19,7 +19,7 @@ def generate_angle_guesses(angle_range: Tuple[float, float], step: float) -> Lis
 
 def optimize_rotation_and_translation(perimeter1: np.ndarray, perimeter2: np.ndarray) -> Optional[np.ndarray]:
     """Optimize rotation angle and translation to align two perimeters."""
-    angle_range: Tuple[float, float] = (-90.0, 90.0)  # Define the range of angles
+    angle_range: Tuple[float, float] = (-45, 45)  # Define the range of angles trimesh (-45, 45) and o3d (-90, 90)
     angle_step: float = 45.0  # Define the step size for the angles
 
     # Generate the initial guesses for angles
