@@ -98,7 +98,7 @@ def process_glb_and_bag(
             with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
                 file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nRotation: {rotation:.5f}")
             # Visualize the BAG and GLB meshes with height coloring for debugging purposes
-            # visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
+            visualize_meshes_with_height_coloring(bag_mesh, glb_mesh, colormap_1='YlOrRd', colormap_2='YlGnBu')
             # perimeter1 = extract_2d_perimeter(bag_mesh)
             # perimeter2 = extract_2d_perimeter(glb_mesh)
             # visualize_2d_perimeters(perimeter1, perimeter2)

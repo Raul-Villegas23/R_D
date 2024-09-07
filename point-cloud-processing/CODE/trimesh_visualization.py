@@ -1,52 +1,53 @@
 import trimesh
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-def plot_meshes_as_points(glb_mesh: trimesh.Trimesh, bag_mesh: trimesh.Trimesh, downsample_factor: int = 1000):
+def apply_height_coloring(mesh: trimesh.Trimesh, colormap_name: str = 'viridis'):
     """
-    Visualize two 3D meshes (GLB and BAG) as point clouds using a 3D plot with matplotlib.
-    
+    Apply height-based coloring to a mesh based on the Z-coordinate.
+
     Parameters:
-    - glb_mesh: trimesh.Trimesh object for the GLB mesh.
-    - bag_mesh: trimesh.Trimesh object for the BAG mesh.
-    - downsample_factor: Factor by which to downsample the GLB mesh points for better performance.
+    - mesh: trimesh.Trimesh object.
+    - colormap_name: Name of the colormap to use (from matplotlib).
     """
-    # Check the number of vertices in both meshes
-    print(f"GLB mesh has {len(glb_mesh.vertices)} vertices")
-    print(f"BAG mesh has {len(bag_mesh.vertices)} vertices")
+    # Get vertex heights (Z-coordinates)
+    heights = mesh.vertices[:, 2]
 
-    # Ensure there are enough points in both meshes
-    if len(glb_mesh.vertices) < 2 or len(bag_mesh.vertices) < 2:
-        print("One of the meshes has too few points to display.")
-        return
+    # Normalize heights to [0, 1] range
+    min_height, max_height = heights.min(), heights.max()
+    normalized_heights = (heights - min_height) / (max_height - min_height)
 
-    # Downsample GLB mesh only if it has too many points
-    glb_points = glb_mesh.vertices[::downsample_factor] if len(glb_mesh.vertices) > downsample_factor else glb_mesh.vertices
-    bag_points = bag_mesh.vertices  # No downsampling for BAG mesh
+    # Apply the colormap
+    colormap = plt.get_cmap(colormap_name)
+    colors = colormap(normalized_heights)[:, :3]  # Get RGB values from the colormap
 
-    print(f"GLB points after downsampling: {glb_points.shape}")
-    print(f"BAG points (no downsampling): {bag_points.shape}")
+    # Assign colors to the mesh vertices
+    mesh.visual.vertex_colors = (colors * 255).astype(np.uint8)
 
-    # Create a 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+def visualize_trimesh_objects(bag_mesh: trimesh.Trimesh, glb_mesh: trimesh.Trimesh, glb_downsample_factor: int = 1000):
+    """
+    Visualize two 3D meshes (BAG and GLB) using Trimesh's built-in viewer, each with different colors.
+    BAG mesh will have height-based coloring.
 
-    # Plot GLB mesh points
-    ax.scatter(glb_points[:, 0], glb_points[:, 1], glb_points[:, 2], c='b', label='GLB Mesh Points', alpha=0.6)
+    Parameters:
+    - bag_mesh: trimesh.Trimesh object for the BAG mesh.
+    - glb_mesh: trimesh.Trimesh object for the GLB mesh.
+    - glb_downsample_factor: Downsampling factor for the GLB mesh.
+    """
 
-    # Plot BAG mesh points
-    ax.scatter(bag_points[:, 0], bag_points[:, 1], bag_points[:, 2], c='g', label='BAG Mesh Points', alpha=0.6)
+    # Apply height coloring to the BAG mesh
+    apply_height_coloring(bag_mesh, colormap_name='viridis')
 
-    # Set labels and title
-    ax.set_title('GLB and BAG Meshes as Point Clouds')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
+    # Assign a solid color to the GLB mesh (e.g., green)
+    glb_mesh.visual.vertex_colors = [0, 255, 0, 255]  # Green for GLB mesh 
 
-    # Add legend
-    ax.legend()
+    # Create a scene and add both meshes
+    scene = trimesh.Scene()
+    scene.add_geometry(bag_mesh, geom_name="BAG Mesh (Height Colored)")
+    scene.add_geometry(glb_mesh, geom_name="GLB Mesh")
 
-    # Show plot
-    plt.show()
+    # Visualize using Trimesh's viewer
+    scene.show()
 
+# Example usage:
+# visualize_trimesh_objects(bag_mesh, glb_mesh)

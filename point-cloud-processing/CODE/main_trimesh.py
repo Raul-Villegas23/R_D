@@ -6,16 +6,14 @@ from typing import List, Tuple, Optional, Dict
 
 # Libraries for point cloud processing
 import numpy as np
-import trimesh.registration as reg
 
 # Import the necessary functions from the custom modules
 from trimesh_fetcher import process_feature_list, print_memory_usage
 from geolocation import extract_latlon_orientation_from_mesh
-# from mesh_processor import load_and_transform_glb_model, align_mesh_centers, apply_optimal_params
 from transformation_utils import accumulate_transformations, calculate_rotation_z
 from trimesh_transformations_utils import compute_z_offset, apply_z_offset
-from visualization_utils import visualize_meshes_with_height_coloring, visualize_2d_perimeters
-from trimesh_visualization import plot_meshes_as_points
+from trimesh_visualization import visualize_trimesh_objects
+from visualization_utils import visualize_2d_perimeters
 from trimesh_alignment import refine_alignment_with_icp_trimesh
 from geometry_utils import extract_2d_perimeter, optimize_rotation_and_translation
 from trimesh_processor import load_and_transform_glb_model_trimesh, align_trimesh_centers, apply_optimal_params_trimesh
@@ -88,7 +86,7 @@ def process_glb_and_bag(
             logging.info(f"Optimal rotation angle around Z-axis: {rotation:.5f} radians")
 
             # Extract latitude, longitude, and orientation
-            lon, lat, rotation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
+            lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
             logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Rotation: {rotation:.5f} radians")
 
             # Write final transformation matrix to file
@@ -99,7 +97,7 @@ def process_glb_and_bag(
             glb_perimeter = extract_2d_perimeter(glb_mesh)
             visualize_2d_perimeters(bag_perimeter, glb_perimeter)
 
-            # plot_meshes_as_points(glb_mesh, bag_mesh)
+            # visualize_trimesh_objects(bag_mesh, glb_mesh)
 
             # Free memory
             del bag_mesh, glb_mesh, transformations

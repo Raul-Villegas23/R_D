@@ -11,6 +11,8 @@ from fetcher import process_feature_list
 from geometry_utils import extract_2d_perimeter
 from visualization_utils import visualize_meshes_with_height_coloring, visualize_2d_perimeters
 
+from trimesh_visualization import visualize_trimesh_objects
+
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
