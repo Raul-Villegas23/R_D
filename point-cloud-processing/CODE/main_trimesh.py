@@ -86,7 +86,7 @@ def process_glb_and_bag(
             logging.info(f"Optimal rotation angle around Z-axis: {rotation:.5f} radians")
 
             # Extract latitude, longitude, and orientation
-            lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
+            lon, lat, _ = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
             logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Rotation: {rotation:.5f} radians")
 
             # Write final transformation matrix to file
