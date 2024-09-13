@@ -53,32 +53,40 @@ def visualize_trimesh_objects(bag_mesh: trimesh.Trimesh, glb_mesh: trimesh.Trime
 # visualize_trimesh_objects(bag_mesh, glb_mesh)
 
 
-def color_origin_vertex(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
-    """Color the vertex at (0, 0, 0) in the mesh with a big red dot.
-
-    Args:
-        mesh (trimesh.Trimesh): The mesh object to be processed.
-
-    Returns:
-        trimesh.Trimesh: A new mesh object with the (0, 0, 0) vertex colored red.
+def color_transformed_origin_vertex(
+    mesh: trimesh.Trimesh, final_transformation_matrix: np.ndarray
+) -> trimesh.Trimesh:
     """
-    # Extract vertices
+    Color the vertex closest to the transformed (0, 0, 0) origin in the mesh with a red dot.
+
+    Parameters:
+        mesh (trimesh.Trimesh): The mesh object.
+        final_transformation_matrix (np.ndarray): The accumulated transformation matrix applied to the mesh.
+        
+    Returns:
+        trimesh.Trimesh: A new mesh object with the vertex closest to the transformed origin colored red.
+    """
+    # Step 1: Define the origin point (0, 0, 0) in the mesh's local coordinate system
+    mesh_origin = np.array([0.0, 0.0, 0.0, 1.0])  # Homogeneous coordinates for transformation
+
+    # Step 2: Apply the final transformation matrix to the mesh origin to get the transformed coordinates
+    transformed_origin_homogeneous = final_transformation_matrix @ mesh_origin
+    transformed_origin = transformed_origin_homogeneous[:3]  # Extract (x, y, z) from homogeneous coordinates
+
+    # Step 3: Calculate the distance from the transformed origin to each vertex in the mesh
     vertices = np.asarray(mesh.vertices)
-    
-    # Calculate the distance from (0, 0, 0) for each vertex
-    distances = np.linalg.norm(vertices, axis=1)
-    
-    # Get the index of the vertex closest to (0, 0, 0)
+    distances = np.linalg.norm(vertices - transformed_origin, axis=1)
+
+    # Step 4: Get the index of the vertex closest to the transformed origin
     origin_vertex_index = np.argmin(distances)
-    
-    # Create a new vertex colors array with the same length as vertices
-    vertex_colors = np.zeros((len(vertices), 4), dtype=np.uint8)
-    
-    # Set the color for the (0, 0, 0) vertex to red
+
+    # Step 5: Create a new vertex colors array with the same length as the number of vertices
+    vertex_colors = np.zeros((len(vertices), 4), dtype=np.uint8)  # Initialize as black (or transparent)
+
+    # Set the color of the closest vertex to red (RGB + Alpha)
     vertex_colors[origin_vertex_index] = [255, 0, 0, 255]  # Red with full opacity
-    
-    # Create a new mesh with vertex colors
-    # Use TextureVisuals if the mesh has textures, otherwise use ColorVisuals
+
+    # Step 6: Create a new visual (color or texture-based, depending on the mesh) with the vertex colors
     if hasattr(mesh.visual, 'texture'):
         texture = mesh.visual.texture
         new_visual = trimesh.visual.TextureVisuals(
@@ -87,8 +95,8 @@ def color_origin_vertex(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
         )
     else:
         new_visual = trimesh.visual.ColorVisuals(vertex_colors=vertex_colors)
-    
-    # Create a new mesh with the updated visual
+
+    # Step 7: Create a new mesh with the updated visual
     new_mesh = trimesh.Trimesh(vertices=vertices, faces=mesh.faces, visual=new_visual)
     
     return new_mesh

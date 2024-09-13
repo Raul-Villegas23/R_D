@@ -12,7 +12,7 @@ from trimesh_fetcher import process_feature_list, print_memory_usage
 from geolocation import extract_latlon_orientation_from_mesh
 from transformation_utils import accumulate_transformations, calculate_rotation_z
 from trimesh_transformations_utils import compute_z_offset, apply_z_offset
-from trimesh_visualization import color_origin_vertex, visualize_trimesh_objects
+from trimesh_visualization import color_transformed_origin_vertex, visualize_trimesh_objects
 from trimesh_alignment import refine_alignment_with_icp_trimesh
 from geometry_utils import extract_2d_perimeter, optimize_rotation_and_translation
 from trimesh_processor import load_and_transform_glb_model_trimesh, align_trimesh_centers, apply_optimal_params_trimesh
@@ -53,10 +53,6 @@ def process_glb_and_bag(
             # Align mesh centers of the BAG and GLB meshes
             glb_mesh, center_alignment_translation = align_trimesh_centers(bag_mesh, glb_mesh)
             transformations.append(center_alignment_translation)
-                        
-            colored_mesh = color_origin_vertex(glb_mesh)
-            # Export the modified mesh
-            colored_mesh.export('colored_mesh.ply')
 
             # Optimize rotation and translation between the BAG and GLB meshes
             perimeter1 = extract_2d_perimeter(bag_mesh)
@@ -100,9 +96,9 @@ def process_glb_and_bag(
             lon, lat = extract_latlon_orientation_from_mesh(glb_mesh, final_transformation_matrix, reference_system)
             logging.info(f"Latitude: {lat}, Longitude: {lon}, Rotation: {rotation} radians")
 
-            colored_mesh = color_origin_vertex(glb_mesh)
-            # Export the modified mesh
-            colored_mesh.export('colored_mesh.ply')
+            colored_mesh = color_transformed_origin_vertex(glb_mesh, final_transformation_matrix)
+            # Export the modified mesh with the name of the GLB dataset
+            colored_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_colored.ply")
 
             # Write final transformation matrix to file
             np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt", final_transformation_matrix)
@@ -117,7 +113,7 @@ def process_glb_and_bag(
            # Color the vertex closest to (0, 0, 0)
 
 
-            visualize_trimesh_objects(bag_mesh, glb_mesh)
+            # visualize_trimesh_objects(bag_mesh, glb_mesh)
 
             # Free memory
             del bag_mesh, glb_mesh, transformations
