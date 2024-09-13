@@ -93,7 +93,7 @@ def process_glb_and_bag(
             np.savetxt(transformation_matrix_filename, final_transformation_matrix)
 
             # Extract the latitude, longitude, and orientation from the transformed GLB mesh
-            lon, lat, orientation = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
+            lon, lat, = extract_latlon_orientation_from_mesh(final_transformation_matrix, reference_system)
             logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Rotation: {rotation:.5f} radians")
             with open(f"RESULTS/{glb_dataset.split('.')[0]}_lat_lon_orientation.txt", "w") as file:
                 file.write(f"Latitude: {lat:.5f}\nLongitude: {lon:.5f}\nRotation: {rotation:.5f}")
