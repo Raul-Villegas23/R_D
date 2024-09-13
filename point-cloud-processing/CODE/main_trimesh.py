@@ -39,9 +39,11 @@ def process_glb_and_bag(
 
         # Load the GLB model and apply transformations
         glb_mesh, initial_transformation = load_and_transform_glb_model_trimesh(glb_model_path, translate)
-        # colored_mesh = color_origin_vertex(glb_mesh)
-        # # Export the modified mesh
-        # colored_mesh.export('colored_mesh.ply')
+        
+        # colored_mesh = color_transformed_origin_vertex(glb_mesh, np.eye(4))
+        # # Export the modified mesh with the name of the GLB dataset
+        # colored_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_colored.ply")
+
 
         if glb_mesh:
             # Initialize the list of transformations with the initial transformation matrix from the GLB model
@@ -93,12 +95,17 @@ def process_glb_and_bag(
             logging.info(f"Optimal rotation angle around Z-axis: {rotation:.5f} radians")
 
             # Extract latitude, longitude, and orientation
-            lon, lat = extract_latlon_orientation_from_mesh(glb_mesh, final_transformation_matrix, reference_system)
+            lon, lat = extract_latlon_orientation_from_mesh(final_transformation_matrix, reference_system)
             logging.info(f"Latitude: {lat}, Longitude: {lon}, Rotation: {rotation} radians")
 
+            # Save the aligned GLB mesh to a file inside RESULTS folder
             colored_mesh = color_transformed_origin_vertex(glb_mesh, final_transformation_matrix)
             # Export the modified mesh with the name of the GLB dataset
             colored_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_colored.ply")
+
+            # Save the bag mesh to a file inside RESULTS folder with the colored origin vertex
+            colored_bag_mesh = color_transformed_origin_vertex(bag_mesh, np.eye(4))
+            colored_bag_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_bag_colored.ply")
 
             # Write final transformation matrix to file
             np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt", final_transformation_matrix)
@@ -108,12 +115,7 @@ def process_glb_and_bag(
             glb_perimeter = extract_2d_perimeter(glb_mesh)
             # visualize_2d_perimeters(bag_perimeter, glb_perimeter)
 
-            # Export the modified mesh
-            # Color the vertex closest to (0, 0, 0)
-           # Color the vertex closest to (0, 0, 0)
-
-
-            # visualize_trimesh_objects(bag_mesh, glb_mesh)
+            visualize_trimesh_objects(bag_mesh, glb_mesh)
 
             # Free memory
             del bag_mesh, glb_mesh, transformations
@@ -129,7 +131,8 @@ def main() -> None:
     tasks: List[Dict[str, List[str]]] = [
         {
             "feature_ids": ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"],
-            "glb_dataset": "pijlkruid.glb"
+            "glb_dataset": "pijlkruid2.glb"
+            # "glb_dataset": "pijlkruidstraat11-13-15.glb"
         },
         {
             "feature_ids": ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"],

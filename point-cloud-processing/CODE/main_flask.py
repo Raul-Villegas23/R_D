@@ -13,7 +13,7 @@ from trimesh_transformations_utils import compute_z_offset, apply_z_offset
 from transformation_utils import accumulate_transformations, calculate_rotation_z
 from geolocation import extract_latlon_orientation_from_mesh
 from geometry_utils import extract_2d_perimeter, optimize_rotation_and_translation
-from trimesh_visualization import visualize_trimesh_objects, color_zero_vertex
+from trimesh_visualization import visualize_trimesh_objects
 
 def process_glb_and_bag(
     feature_ids: List[str],
@@ -63,16 +63,14 @@ def process_glb_and_bag(
             final_transformation_matrix = accumulate_transformations(transformations)
             rotation = calculate_rotation_z(final_transformation_matrix)
             print(f"Rotation: {rotation}")
-            lon, lat, _ = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
+            lon, lat = extract_latlon_orientation_from_mesh(final_transformation_matrix, reference_system)
+            print(f"Latitude: {lat}, Longitude: {lon}")
 
             # Visualize the results
-            color_zero_vertex(glb_mesh)
-            visualize_trimesh_objects(bag_mesh, glb_mesh)
+            # visualize_trimesh_objects(bag_mesh, glb_mesh)
 
-            # Save the aligned GLB mesh to a file
-            aligned_glb_file = glb_file_path.replace('.glb', '_aligned.ply')
-            glb_mesh.export(aligned_glb_file)
-            
+            # Save the aligned GLB mesh to a file inside RESULTS folder
+            glb_mesh.export(f"RESULTS/{glb_file_path.split('/')[-1].split('.')[0]}_aligned.ply")
 
             # Return the result as a dictionary
             return {

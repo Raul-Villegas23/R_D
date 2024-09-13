@@ -32,7 +32,7 @@ def get_geo_location(lat: float, lon: float, reference_system: str) -> Optional[
         return None
     
 def extract_latlon_orientation_from_mesh(
-    mesh: trimesh.Trimesh, final_transformation_matrix: np.ndarray, reference_system: str
+        final_transformation_matrix: np.ndarray, reference_system: str
 ) -> Tuple[float, float]:
     """
     Extract longitude and latitude from the transformed mesh origin (0,0,0).
