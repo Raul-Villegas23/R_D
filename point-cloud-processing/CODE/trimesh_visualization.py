@@ -2,7 +2,7 @@ import trimesh
 import numpy as np
 import matplotlib.pyplot as plt
 
-def apply_height_coloring(mesh: trimesh.Trimesh, colormap_name: str = 'viridis'):
+def apply_height_coloring(mesh: trimesh.Trimesh, colormap_name: str = 'YlGnBu'):
     """
     Apply height-based coloring to a mesh based on the Z-coordinate.
 
@@ -36,7 +36,7 @@ def visualize_trimesh_objects(bag_mesh: trimesh.Trimesh, glb_mesh: trimesh.Trime
     """
 
     # Apply height coloring to the BAG mesh
-    apply_height_coloring(bag_mesh, colormap_name='viridis')
+    apply_height_coloring(bag_mesh, colormap_name='YlGnBu')
 
     # Assign a solid color to the GLB mesh (e.g., green)
     glb_mesh.visual.vertex_colors = [0, 255, 0, 255]  # Green for GLB mesh 
@@ -51,3 +51,45 @@ def visualize_trimesh_objects(bag_mesh: trimesh.Trimesh, glb_mesh: trimesh.Trime
 
 # Example usage:
 # visualize_trimesh_objects(bag_mesh, glb_mesh)
+
+
+def color_origin_vertex(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+    """Color the vertex at (0, 0, 0) in the mesh with a big red dot.
+
+    Args:
+        mesh (trimesh.Trimesh): The mesh object to be processed.
+
+    Returns:
+        trimesh.Trimesh: A new mesh object with the (0, 0, 0) vertex colored red.
+    """
+    # Extract vertices
+    vertices = np.asarray(mesh.vertices)
+    
+    # Calculate the distance from (0, 0, 0) for each vertex
+    distances = np.linalg.norm(vertices, axis=1)
+    
+    # Get the index of the vertex closest to (0, 0, 0)
+    origin_vertex_index = np.argmin(distances)
+    
+    # Create a new vertex colors array with the same length as vertices
+    vertex_colors = np.zeros((len(vertices), 4), dtype=np.uint8)
+    
+    # Set the color for the (0, 0, 0) vertex to red
+    vertex_colors[origin_vertex_index] = [255, 0, 0, 255]  # Red with full opacity
+    
+    # Create a new mesh with vertex colors
+    # Use TextureVisuals if the mesh has textures, otherwise use ColorVisuals
+    if hasattr(mesh.visual, 'texture'):
+        texture = mesh.visual.texture
+        new_visual = trimesh.visual.TextureVisuals(
+            texture=texture,
+            vertex_colors=vertex_colors
+        )
+    else:
+        new_visual = trimesh.visual.ColorVisuals(vertex_colors=vertex_colors)
+    
+    # Create a new mesh with the updated visual
+    new_mesh = trimesh.Trimesh(vertices=vertices, faces=mesh.faces, visual=new_visual)
+    
+    return new_mesh
+

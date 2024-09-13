@@ -1,33 +1,85 @@
 import trimesh
 import numpy as np
 import logging
-import trimesh.registration
-from typing import Optional, Tuple
 from trimesh.transformations import rotation_matrix
 from trimesh.registration import icp
+from typing import Optional, Tuple
 
 
 def voxel_downsample(points: np.ndarray, voxel_size: float) -> np.ndarray:
     """
-    Voxel downsample the input point cloud.
+    Voxel downsample the input point cloud by reducing points into voxel grid cells.
+    This reduces the number of points by keeping only one point per voxel.
+    """
+    quantized = np.floor(points / voxel_size).astype(np.int32)
+    _, unique_indices = np.unique(quantized, axis=0, return_index=True)
+    return points[unique_indices]
+
+
+def sample_and_downsample(
+    mesh: trimesh.Trimesh, num_samples: int, voxel_size: float
+) -> np.ndarray:
+    """
+    Sample points from a mesh and downsample the point cloud using voxel downsampling.
+    """
+    points = mesh.sample(num_samples)
+    return voxel_downsample(np.array(points), voxel_size)
+
+
+def hierarchical_icp(
+    source_points: np.ndarray,
+    target_points: np.ndarray,
+    voxel_sizes: list,
+    threshold: float,
+    max_iterations: int,
+    initial_transformation: np.ndarray,
+) -> Tuple[np.ndarray, float]:
+    """
+    Perform hierarchical (multi-resolution) ICP, starting with a coarse alignment and refining it at finer resolutions.
 
     Parameters:
-    - points: The input point cloud (Nx3 array).
-    - voxel_size: The size of the voxel grid.
+    - source_points: Source point cloud to align.
+    - target_points: Target point cloud to align to.
+    - voxel_sizes: List of voxel sizes to use for hierarchical ICP (coarse to fine).
+    - threshold: Distance threshold for ICP convergence.
+    - max_iterations: Maximum number of iterations for each ICP stage.
+    - initial_transformation: Initial transformation matrix for ICP.
 
     Returns:
-    - downsampled_points: The downsampled point cloud.
+    - best_matrix: The final transformation matrix after alignment.
+    - best_cost: The cost of the final alignment.
     """
-    # Quantize the point cloud based on the voxel size
-    quantized = np.floor(points / voxel_size).astype(np.int32)
+    current_transformation = initial_transformation
 
-    # Find unique quantized points (effectively downsampling)
-    unique_quantized, unique_indices = np.unique(quantized, axis=0, return_index=True)
+    # Downsample source and target once using the smallest voxel size to avoid redundant calculations
+    smallest_voxel_size = min(voxel_sizes)
+    source_downsampled = voxel_downsample(source_points, smallest_voxel_size)
+    target_downsampled = voxel_downsample(target_points, smallest_voxel_size)
 
-    # Use the unique indices to get the downsampled points
-    downsampled_points = points[unique_indices]
+    for voxel_size in voxel_sizes:
+        if voxel_size != smallest_voxel_size:
+            # Further downsample the pre-downsampled points
+            source_voxel_down = voxel_downsample(source_downsampled, voxel_size)
+            target_voxel_down = voxel_downsample(target_downsampled, voxel_size)
+        else:
+            # Use the smallest downsampled points directly
+            source_voxel_down = source_downsampled
+            target_voxel_down = target_downsampled
 
-    return downsampled_points
+        # Perform ICP
+        # logging.info(
+        #     f"Running ICP with voxel size: {voxel_size}, {len(source_voxel_down)} points"
+        # )
+        matrix, _, cost = icp(
+            source_voxel_down,
+            target_voxel_down,
+            initial=current_transformation,
+            threshold=threshold,
+            max_iterations=max_iterations,
+        )
+        current_transformation = matrix  # Update transformation with the result
+
+    return current_transformation, cost
 
 
 def refine_alignment_with_icp_trimesh(
@@ -36,81 +88,71 @@ def refine_alignment_with_icp_trimesh(
     threshold: float = 0.01,
     max_iterations: int = 1000,
     initial_transformation: Optional[np.ndarray] = None,
+    voxel_sizes: list = [0.1, 0.05, 0.02],  # Coarse to fine resolution
+    num_samples: int = 10000,
 ) -> Tuple[trimesh.Trimesh, np.ndarray]:
     """
-    Refines the alignment of a source mesh to a target mesh using ICP, compares normal and 180-degree flipped GLB mesh.
+    Refines the alignment of a source mesh to a target mesh using hierarchical ICP (multi-resolution),
+    and compares normal and 180-degree flipped versions of the source mesh.
 
     Parameters:
-    - source_mesh: The source mesh to be aligned (trimesh.Trimesh).
-    - target_mesh: The target mesh to align to (trimesh.Trimesh).
-    - threshold: The distance threshold for ICP convergence.
-    - max_iterations: The maximum number of iterations for ICP.
-    - initial_transformation: Initial transformation matrix for the ICP process.
+    - source_mesh: The source mesh to be aligned.
+    - target_mesh: The target mesh to align to.
+    - threshold: Distance threshold for ICP convergence.
+    - max_iterations: Maximum number of ICP iterations.
+    - initial_transformation: Initial transformation matrix for ICP.
+    - voxel_sizes: List of voxel sizes for hierarchical ICP.
+    - num_samples: Number of points to sample from the meshes.
 
     Returns:
     - best_source_mesh: The transformed source mesh after the best alignment.
-    - best_transformation: The final transformation matrix used for alignment.
+    - best_transformation: The transformation matrix that gave the best alignment.
     """
+    logging.info("Starting ICP registration...")
 
-    logging.info("Starting basic ICP registration with Trimesh...")
+    # Sample points once from both meshes
+    source_points = np.array(source_mesh.sample(num_samples))
+    target_points = np.array(target_mesh.sample(num_samples))
 
-    # Step 1: Copy the source and target meshes to avoid modifying the originals
-    source_copy = source_mesh.copy()
-    target_copy = target_mesh.copy()
-
-    # Step 2: Sample points from the meshes using Trimesh's sample method
-    source_points = source_copy.sample(10000)
-    target_points = target_copy.sample(10000)
-
-    # Step 3: Downsample points using voxel downsampling
-    voxel_size = 0.05  # Define the voxel size
-    source_points_downsampled = voxel_downsample(np.array(source_points), voxel_size)
-    target_points_downsampled = voxel_downsample(np.array(target_points), voxel_size)
-
-    # Step 4: Set the initial transformation matrix
+    # Initialize transformation matrix
     if initial_transformation is None:
         initial_transformation = np.eye(4)
 
-    # Step 5: Perform ICP registration without flipping
-    matrix_normal, aligned_source_points_normal, cost_normal = icp(
-        source_points_downsampled,
-        target_points_downsampled,
-        initial=initial_transformation,
+    # Perform hierarchical ICP on normal orientation
+    # logging.info("Performing ICP for normal orientation...")
+    matrix_normal, cost_normal = hierarchical_icp(
+        source_points,
+        target_points,
+        voxel_sizes=voxel_sizes,
         threshold=threshold,
         max_iterations=max_iterations,
+        initial_transformation=initial_transformation,
     )
-    logging.info(f"Normal ICP completed with cost: {cost_normal:.6f}")
+    # logging.info(f"Normal ICP completed with cost: {cost_normal:.6f}")
 
-    # Step 6: Apply 180-degree rotation around the Z-axis from the center of the mesh
-    flip_180_z = rotation_matrix(np.radians(180), [0, 0, 1], source_copy.centroid)
+    # Apply 180-degree flip around Z-axis (apply the transformation directly to the points)
+    # logging.info("Performing ICP for flipped orientation...")
+    flip_180_z = rotation_matrix(np.radians(180), [0, 0, 1], source_mesh.centroid)
+    source_points_flipped = trimesh.transform_points(source_points, flip_180_z)
 
-    # Apply the rotation to the source mesh
-    source_copy.apply_transform(flip_180_z)
-
-    # Step 7: Perform ICP registration with the flipped mesh
-    source_points_flipped = source_copy.sample(10000)  # Re-sample after transformation
-    source_points_flipped = np.array(source_points_flipped)  # Convert to ndarray
-    source_points_flipped_downsampled = voxel_downsample(
-        source_points_flipped, voxel_size
-    )
-
-    matrix_flipped, aligned_source_points_flipped, cost_flipped = icp(
-        source_points_flipped_downsampled,
-        target_points_downsampled,
-        initial=initial_transformation,
+    # Perform hierarchical ICP on flipped orientation
+    matrix_flipped, cost_flipped = hierarchical_icp(
+        source_points_flipped,
+        target_points,
+        voxel_sizes=voxel_sizes,
         threshold=threshold,
         max_iterations=max_iterations,
+        initial_transformation=initial_transformation,
     )
-    logging.info(f"Flipped ICP completed with cost: {cost_flipped:.6f}")
+    # logging.info(f"Flipped ICP completed with cost: {cost_flipped:.6f}")
 
-    # Step 8: Compare the ICP costs and choose the better transformation
+    # Choose the best transformation based on cost
     if cost_flipped < cost_normal:
-        # Use flipped transformation
         best_transformation = matrix_flipped @ flip_180_z
-        best_source_mesh = source_copy.copy()  # Flipped and transformed mesh
+        best_source_mesh = source_mesh.copy()
+        best_source_mesh.apply_transform(best_transformation)
         logging.info(f"Flipped transformation chosen with cost: {cost_flipped:.6f}")
     else:
-        # Use normal transformation
         best_transformation = matrix_normal
         best_source_mesh = source_mesh.copy()
         best_source_mesh.apply_transform(best_transformation)

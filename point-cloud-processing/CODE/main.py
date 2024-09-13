@@ -115,16 +115,16 @@ def main() -> None:
     tasks: List[Dict[str, List[str]]] = [
         {
             "feature_ids": ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"],
-            "glb_dataset": "pijlkruidstraat11-13-15.glb"
+            "glb_dataset": "pijlkruid.glb"
         },
-        {
-            "feature_ids": ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"],
-            "glb_dataset": "pijlkruid37-37.glb"
-        },
-        {
-            "feature_ids": ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"],
-            "glb_dataset": "rietstraat31-33.glb"
-        }
+        # {
+        #     "feature_ids": ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"],
+        #     "glb_dataset": "pijlkruid37-37.glb"
+        # },
+        # {
+        #     "feature_ids": ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"],
+        #     "glb_dataset": "rietstraat31-33.glb"
+        # }
     ]
 
     # Process each task in the list with the corresponding feature IDs and GLB dataset

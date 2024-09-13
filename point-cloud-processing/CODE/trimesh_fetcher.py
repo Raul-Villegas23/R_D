@@ -32,7 +32,7 @@ def process_feature_list(collections_url: str, collection_id: str, feature_ids: 
     with requests.Session() as session:
         # Concurrent fetching and processing
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(fetch_and_process_feature, session, collections_url, collection_id, feature_id) for feature_id in feature_ids]
+            futures = [executor.submit(fetch_and_process_feature, session, collections_url, collection_id, feature_id.strip()) for feature_id in feature_ids]
 
             for future in concurrent.futures.as_completed(futures):
                 mesh, feature_scale, feature_translate, ref_system = future.result()

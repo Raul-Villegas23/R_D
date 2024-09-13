@@ -3,6 +3,7 @@ import trimesh
 from typing import Optional, Tuple, Dict, Any
 import logging
 
+
 def create_trimesh_from_feature(
     feature: Dict[str, Any]
 ) -> Tuple[Optional[trimesh.Trimesh], Optional[np.ndarray], Optional[np.ndarray]]:
@@ -95,12 +96,6 @@ def load_and_transform_glb_model_trimesh(
         logging.error("The GLB model has no vertices or faces.")
         return None, None
 
-    # Post-processing: Center the mesh
-    if enable_post_processing:
-        bbox = mesh.bounds
-        mesh_center = (bbox[0] + bbox[1]) / 2
-        mesh.apply_translation(-mesh_center)
-
     # Define a transformation matrix (left-handed to right-handed)
     transformation_matrix = np.array([
         [-1, 0, 0, 0],
@@ -108,7 +103,14 @@ def load_and_transform_glb_model_trimesh(
         [0, 1, 0, 0],
         [0, 0, 0, 1]
     ])
-    
+
+    # If post-processing is enabled, center the mesh without affecting the origin
+    if enable_post_processing:
+        bbox = mesh.bounds
+        mesh_center = (bbox[0] + bbox[1]) / 2
+        # Apply the transformation to center the mesh without changing the origin
+        mesh.apply_translation(-mesh_center)
+
     # Define a translation matrix
     translation_matrix = np.eye(4)
     translation_matrix[:3, 3] = translate

@@ -12,8 +12,7 @@ from trimesh_fetcher import process_feature_list, print_memory_usage
 from geolocation import extract_latlon_orientation_from_mesh
 from transformation_utils import accumulate_transformations, calculate_rotation_z
 from trimesh_transformations_utils import compute_z_offset, apply_z_offset
-from trimesh_visualization import visualize_trimesh_objects
-from visualization_utils import visualize_2d_perimeters
+from trimesh_visualization import color_origin_vertex, visualize_trimesh_objects
 from trimesh_alignment import refine_alignment_with_icp_trimesh
 from geometry_utils import extract_2d_perimeter, optimize_rotation_and_translation
 from trimesh_processor import load_and_transform_glb_model_trimesh, align_trimesh_centers, apply_optimal_params_trimesh
@@ -40,21 +39,33 @@ def process_glb_and_bag(
 
         # Load the GLB model and apply transformations
         glb_mesh, initial_transformation = load_and_transform_glb_model_trimesh(glb_model_path, translate)
+        # colored_mesh = color_origin_vertex(glb_mesh)
+        # # Export the modified mesh
+        # colored_mesh.export('colored_mesh.ply')
 
         if glb_mesh:
             # Initialize the list of transformations with the initial transformation matrix from the GLB model
-            transformations: List[np.ndarray] = [initial_transformation]
+            if initial_transformation is not None:
+                transformations: List[np.ndarray] = [initial_transformation]
+            else:
+                transformations: List[np.ndarray] = []
 
             # Align mesh centers of the BAG and GLB meshes
             glb_mesh, center_alignment_translation = align_trimesh_centers(bag_mesh, glb_mesh)
             transformations.append(center_alignment_translation)
+                        
+            colored_mesh = color_origin_vertex(glb_mesh)
+            # Export the modified mesh
+            colored_mesh.export('colored_mesh.ply')
 
             # Optimize rotation and translation between the BAG and GLB meshes
             perimeter1 = extract_2d_perimeter(bag_mesh)
             perimeter2 = extract_2d_perimeter(glb_mesh)
 
             optimal_params = optimize_rotation_and_translation(perimeter1, perimeter2)
-            if optimal_params is not None:
+
+            # Ensure optimal_params is valid
+            if optimal_params is not None and len(optimal_params) > 0:
                 optimal_angle, optimal_tx, optimal_ty = optimal_params
                 glb_mesh, t = apply_optimal_params_trimesh(glb_mesh, optimal_angle, optimal_tx, optimal_ty)
                 transformations.append(t)
@@ -86,8 +97,12 @@ def process_glb_and_bag(
             logging.info(f"Optimal rotation angle around Z-axis: {rotation:.5f} radians")
 
             # Extract latitude, longitude, and orientation
-            lon, lat, _ = extract_latlon_orientation_from_mesh(glb_mesh, reference_system)
-            logging.info(f"Latitude: {lat:.5f}, Longitude: {lon:.5f}, Rotation: {rotation:.5f} radians")
+            lon, lat = extract_latlon_orientation_from_mesh(glb_mesh, final_transformation_matrix, reference_system)
+            logging.info(f"Latitude: {lat}, Longitude: {lon}, Rotation: {rotation} radians")
+
+            colored_mesh = color_origin_vertex(glb_mesh)
+            # Export the modified mesh
+            colored_mesh.export('colored_mesh.ply')
 
             # Write final transformation matrix to file
             np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt", final_transformation_matrix)
@@ -95,9 +110,14 @@ def process_glb_and_bag(
             # Visualize with matplotlib
             bag_perimeter = extract_2d_perimeter(bag_mesh)
             glb_perimeter = extract_2d_perimeter(glb_mesh)
-            visualize_2d_perimeters(bag_perimeter, glb_perimeter)
+            # visualize_2d_perimeters(bag_perimeter, glb_perimeter)
 
-            # visualize_trimesh_objects(bag_mesh, glb_mesh)
+            # Export the modified mesh
+            # Color the vertex closest to (0, 0, 0)
+           # Color the vertex closest to (0, 0, 0)
+
+
+            visualize_trimesh_objects(bag_mesh, glb_mesh)
 
             # Free memory
             del bag_mesh, glb_mesh, transformations
@@ -113,7 +133,7 @@ def main() -> None:
     tasks: List[Dict[str, List[str]]] = [
         {
             "feature_ids": ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"],
-            "glb_dataset": "pijlkruidstraat11-13-15.glb"
+            "glb_dataset": "pijlkruid.glb"
         },
         {
             "feature_ids": ["NL.IMBAG.Pand.0141100000049153", "NL.IMBAG.Pand.0141100000049152"],
@@ -132,6 +152,8 @@ def main() -> None:
         process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id)
         print_memory_usage(f"after processing {glb_dataset}")
         print("\n")
+        # Print the time per task
+        logging.info(f"Time for processing {glb_dataset}: {time.time() - start_time:.3f} seconds")
 
     logging.info(f"Total elapsed time: {time.time() - start_time:.3f} seconds")
     print_memory_usage("end")
