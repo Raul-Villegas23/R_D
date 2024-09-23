@@ -10,12 +10,12 @@ import numpy as np
 # Import the necessary functions from the custom modules
 from trimesh_fetcher import process_feature_list, print_memory_usage
 from geolocation import extract_latlon_orientation_from_mesh
-from transformation_utils import accumulate_transformations, calculate_rotation_z
 from trimesh_transformations_utils import compute_z_offset, apply_z_offset
 from trimesh_visualization import color_transformed_origin_vertex, visualize_trimesh_objects
 from trimesh_alignment import refine_alignment_with_icp_trimesh
 from geometry_utils import extract_2d_perimeter, optimize_rotation_and_translation
 from trimesh_processor import load_and_transform_glb_model_trimesh, align_trimesh_centers, apply_optimal_params_trimesh
+from trimesh_transformations_utils import accumulate_transformations, calculate_rotation_z
 
 def process_glb_and_bag(
     feature_ids: List[str],
@@ -131,7 +131,7 @@ def main() -> None:
     tasks: List[Dict[str, List[str]]] = [
         {
             "feature_ids": ["NL.IMBAG.Pand.0141100000048693", "NL.IMBAG.Pand.0141100000048692", "NL.IMBAG.Pand.0141100000049132"],
-            "glb_dataset": "pijlkruid2.glb"
+            "glb_dataset": "pijlkruid.glb"
             # "glb_dataset": "pijlkruidstraat11-13-15.glb"
         },
         {
