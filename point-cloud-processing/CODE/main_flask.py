@@ -26,7 +26,7 @@ def process_glb_and_bag(
 
     if bag_mesh and scale is not None and translate is not None and reference_system is not None:
         # Load the GLB model and apply transformations
-        glb_mesh, initial_transformation = load_and_transform_glb_model_trimesh(glb_file_path, translate)
+        glb_mesh, initial_transformation, origin = load_and_transform_glb_model_trimesh(glb_file_path, translate)
 
         if glb_mesh:
             if initial_transformation is not None:
@@ -63,7 +63,8 @@ def process_glb_and_bag(
             final_transformation_matrix = accumulate_transformations(transformations)
             rotation = calculate_rotation_z(final_transformation_matrix)
             print(f"Rotation: {rotation}")
-            lon, lat = extract_latlon_orientation_from_mesh(final_transformation_matrix, reference_system)
+            # Extract latitude, longitude, and orientation
+            lon, lat = extract_latlon_orientation_from_mesh(final_transformation_matrix, reference_system, origin)
             print(f"Latitude: {lat}, Longitude: {lon}")
 
             # Visualize the results

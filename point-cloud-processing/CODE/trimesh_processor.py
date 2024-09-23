@@ -61,6 +61,22 @@ def create_trimesh_from_feature(
     else:
         logging.error("No vertices found in the feature data.")
         return None, None, None
+    
+def find_closest_vertex(vertices: np.ndarray) -> Tuple[np.ndarray, int]:
+    """
+    Find the closest vertex to the origin in a set of vertices.
+
+    Parameters:
+    - vertices: A numpy array of vertices.
+
+    Returns:
+    - closest_vertex: The vertex closest to the origin.
+    - index: The index of the closest vertex.
+    """
+    distances = np.linalg.norm(vertices, axis=1) # Calculate the Euclidean distance to the origin (0, 0, 0)
+    index = np.argmin(distances) # Find the index of the closest vertex based on distance
+    closest_vertex = vertices[index] # Get the closest vertex
+    return closest_vertex, index
 
 def load_and_transform_glb_model_trimesh(
     file_path: str, 
@@ -95,6 +111,9 @@ def load_and_transform_glb_model_trimesh(
     if mesh.vertices.shape[0] == 0 or mesh.faces.shape[0] == 0:
         logging.error("The GLB model has no vertices or faces.")
         return None, None
+    
+    # Get the closest point to the origin
+    closest_vertex, _ = find_closest_vertex(mesh.vertices)
 
     # Define a transformation matrix (left-handed to right-handed)
     transformation_matrix = np.array([
@@ -121,7 +140,7 @@ def load_and_transform_glb_model_trimesh(
     # Apply the transformation to the mesh
     mesh.apply_transform(combined_transformation)
 
-    return mesh, combined_transformation
+    return mesh, combined_transformation, closest_vertex
 
 def align_trimesh_centers(
     mesh1: trimesh.Trimesh, 
