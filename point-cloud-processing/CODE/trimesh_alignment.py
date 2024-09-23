@@ -85,7 +85,7 @@ def hierarchical_icp(
 def refine_alignment_with_icp_trimesh(
     source_mesh: trimesh.Trimesh,
     target_mesh: trimesh.Trimesh,
-    threshold: float = 0.01,
+    threshold: float = 0.001,
     max_iterations: int = 1000,
     initial_transformation: Optional[np.ndarray] = None,
     voxel_sizes: list = [0.1, 0.05, 0.02],  # Coarse to fine resolution

@@ -115,7 +115,7 @@ def process_glb_and_bag(
             glb_perimeter = extract_2d_perimeter(glb_mesh)
             # visualize_2d_perimeters(bag_perimeter, glb_perimeter)
 
-            # visualize_trimesh_objects(bag_mesh, glb_mesh)
+            visualize_trimesh_objects(bag_mesh, glb_mesh)
 
             # Free memory
             del bag_mesh, glb_mesh, transformations
