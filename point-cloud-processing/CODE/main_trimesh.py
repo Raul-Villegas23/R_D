@@ -38,7 +38,7 @@ def process_glb_and_bag(
         glb_model_path = data_folder + glb_dataset
 
         # Load the GLB model and apply transformations
-        glb_mesh, initial_transformation, origin = load_and_transform_glb_model_trimesh(glb_model_path, translate)
+        glb_mesh, initial_transformation= load_and_transform_glb_model_trimesh(glb_model_path, translate)
         
         # colored_mesh = color_transformed_origin_vertex(glb_mesh, np.eye(4))
         # # Export the modified mesh with the name of the GLB dataset
@@ -95,27 +95,14 @@ def process_glb_and_bag(
             logging.info(f"Optimal rotation angle around Z-axis: {rotation:.5f} radians")
 
             # Extract latitude, longitude, and orientation
-            lon, lat = extract_latlon_orientation_from_mesh(final_transformation_matrix, reference_system, origin)
+            lon, lat = extract_latlon_orientation_from_mesh(final_transformation_matrix, reference_system)
             logging.info(f"Latitude: {lat}, Longitude: {lon}, Rotation: {rotation} radians")
-
-            # Save the aligned GLB mesh to a file inside RESULTS folder
-            colored_mesh = color_transformed_origin_vertex(glb_mesh, final_transformation_matrix)
-            # Export the modified mesh with the name of the GLB dataset
-            colored_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_colored.ply")
-
-            # Save the bag mesh to a file inside RESULTS folder with the colored origin vertex
-            colored_bag_mesh = color_transformed_origin_vertex(bag_mesh, np.eye(4))
-            colored_bag_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_bag_colored.ply")
 
             # Write final transformation matrix to file
             np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt", final_transformation_matrix)
 
-            # Visualize with matplotlib
-            bag_perimeter = extract_2d_perimeter(bag_mesh)
-            glb_perimeter = extract_2d_perimeter(glb_mesh)
-            # visualize_2d_perimeters(bag_perimeter, glb_perimeter)
-
-            visualize_trimesh_objects(bag_mesh, glb_mesh)
+            # Save the aligned glb mesh
+            glb_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_aligned.ply")
 
             # Free memory
             del bag_mesh, glb_mesh, transformations

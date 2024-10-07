@@ -98,49 +98,58 @@ def load_and_transform_glb_model_trimesh(
 
     # Load the mesh or scene using trimesh
     scene_or_mesh = trimesh.load_mesh(file_path)
+    selected_meshes = []
 
     # Check if the loaded object is a scene (contains multiple meshes) or a single mesh
     if isinstance(scene_or_mesh, trimesh.Scene):
-        logging.info("Loaded GLB file contains multiple meshes.")
-        # Combine all meshes in the scene into a single mesh
-        mesh = trimesh.util.concatenate(scene_or_mesh.dump(concatenate=True))
-    else:
+        # Prioritize meshes if they contain "opaque" in the name
+        for name, geometry in scene_or_mesh.geometry.items():
+            # Check for "opaque" in the name
+            if "opaque" in name.lower():
+                selected_meshes.append(geometry)
+
+        # If no opaque meshes were found, but other geometries are available
+        if not selected_meshes:
+            logging.warning("No opaque meshes found, will include other geometries.")
+            selected_meshes = list(scene_or_mesh.geometry.values())
+
+        if selected_meshes:
+            mesh = trimesh.util.concatenate(selected_meshes)
+        else:
+            logging.error("No suitable meshes found in the GLB model.")
+            raise ValueError(
+                "No suitable meshes found in the GLB model."
+            )  # Raise an exception
+
+    elif isinstance(scene_or_mesh, trimesh.Trimesh):
         mesh = scene_or_mesh
+    else:
+        logging.error("Loaded object is neither a Trimesh.Scene nor a Trimesh.")
+        raise ValueError("Loaded object is neither a Trimesh.Scene nor a Trimesh.")
 
     # Ensure the mesh has vertices and faces
     if mesh.vertices.shape[0] == 0 or mesh.faces.shape[0] == 0:
         logging.error("The GLB model has no vertices or faces.")
-        return None, None
-    
-    # Get the closest point to the origin
-    closest_vertex, _ = find_closest_vertex(mesh.vertices)
+        raise ValueError(
+            "The GLB model has no vertices or faces."
+        )  # Raise an exception
 
-    # Define a transformation matrix (left-handed to right-handed)
-    transformation_matrix = np.array([
-        [-1, 0, 0, 0],
-        [0, 0, 1, 0],
-        [0, 1, 0, 0],
-        [0, 0, 0, 1]
-    ])
+    # This transformation matrix is used to convert the GLB model from a left-handed coordinate system to a right-handed one
+    transformation_matrix = np.array(
+        [[-1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
+    )
 
-    # If post-processing is enabled, center the mesh without affecting the origin
-    if enable_post_processing:
-        bbox = mesh.bounds
-        mesh_center = (bbox[0] + bbox[1]) / 2
-        # Apply the transformation to center the mesh without changing the origin
-        mesh.apply_translation(-mesh_center)
-
-    # Define a translation matrix
+    # Define a translation matrix to move the model to the 3d bag origin location
     translation_matrix = np.eye(4)
     translation_matrix[:3, 3] = translate
 
-    # Combine transformations (rotation + translation)
+    # Combine transformations (translation + rotation)
     combined_transformation = translation_matrix @ transformation_matrix
 
     # Apply the transformation to the mesh
     mesh.apply_transform(combined_transformation)
 
-    return mesh, combined_transformation, closest_vertex
+    return mesh, combined_transformation
 
 def align_trimesh_centers(
     mesh1: trimesh.Trimesh, 
