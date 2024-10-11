@@ -99,10 +99,13 @@ def process_glb_and_bag(
             logging.info(f"Latitude: {lat}, Longitude: {lon}, Rotation: {rotation} radians")
 
             # Write final transformation matrix to file
-            np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt", final_transformation_matrix)
+            # np.savetxt(f"RESULTS/{glb_dataset.split('.')[0]}_transformation_matrix.txt", final_transformation_matrix)
 
             # Save the aligned glb mesh
-            glb_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_aligned.ply")
+            # glb_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_aligned.ply")
+
+            # Visualize the aligned meshes
+            visualize_trimesh_objects(bag_mesh, glb_mesh)
 
             # Free memory
             del bag_mesh, glb_mesh, transformations

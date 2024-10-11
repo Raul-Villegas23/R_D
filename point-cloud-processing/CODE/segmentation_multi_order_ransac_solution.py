@@ -10,20 +10,14 @@ import numpy as np
 import open3d as o3d
 import matplotlib.pyplot as plt
 
-#%% 2. Mesh Import
+#%% 2. Point Cloud Import
 
-DATANAME = "pijlkruid37-37.glb"
-mesh = o3d.io.read_triangle_mesh("../DATA/" + DATANAME)
-print(mesh)
-
-#%% Conversion to Point Cloud
-pcd = mesh.sample_points_uniformly(number_of_points=1000000)
-print(pcd)
+DATANAME = "ITC_groundfloor.ply"
+pcd = o3d.io.read_point_cloud("../DATA/" + DATANAME)
 
 #%% 3. Data Pre-Processing
 pcd_center = pcd.get_center()
 pcd.translate(-pcd_center)
-# Visualize using draw
 o3d.visualization.draw_geometries([pcd])
 
 # 3.1. Sampling
@@ -328,7 +322,7 @@ for idx in segments:
 rest_w_segments=np.hstack((np.asarray(rest.points),(labels+max_plane_idx).reshape(-1, 1)))
 xyz_segments.append(rest_w_segments)
 
-# np.savetxt("../RESULTS/" + DATANAME.split(".")[0] + ".xyz", np.concatenate(xyz_segments), delimiter=';', fmt='%1.9f')
+np.savetxt("../RESULTS/" + DATANAME.split(".")[0] + ".xyz", np.concatenate(xyz_segments), delimiter=';', fmt='%1.9f')
 
 #%% Creating a 3D mesh voxel model
 
@@ -378,8 +372,6 @@ def voxel_modelling(filename, indices, voxel_size):
             voxel_assembly.append(voxel)
     return voxel_assembly
 
-# vrsac = voxel_modelling("../RESULTS/ransac_vox.obj", filled_ransac, 1)
-# vrest = voxel_modelling("../RESULTS/rest_vox.obj", filled_rest, 1)
-# voxel_modelling("../RESULTS/empty_vox.obj", empty_indices, 1)
-
-# %%
+vrsac = voxel_modelling("../RESULTS/ransac_vox.obj", filled_ransac, 1)
+vrest = voxel_modelling("../RESULTS/rest_vox.obj", filled_rest, 1)
+voxel_modelling("../RESULTS/empty_vox.obj", empty_indices, 1)
