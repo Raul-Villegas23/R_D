@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 #%% 2. Point Cloud Import
 
-DATANAME = "ITC_groundfloor.ply"
+DATANAME = "appartment_cloud.ply"
 pcd = o3d.io.read_point_cloud("../DATA/" + DATANAME)
 
 #%% 3. Data Pre-Processing
@@ -40,7 +40,7 @@ outliers.paint_uniform_color([1, 0, 0])
 o3d.visualization.draw_geometries([filtered_pcd, outliers])
 
 #%% 3.3. Voxel downsampling
-voxel_size = 0.05
+voxel_size = 0.01
 
 pcd_downsampled = filtered_pcd.voxel_down_sample(voxel_size = voxel_size)
 o3d.visualization.draw_geometries([pcd_downsampled])
@@ -87,10 +87,10 @@ o3d.visualization.draw_geometries([pcd_downsampled,outliers])
 # zoom = 0.25999999999999956
 
 # R0
-front = [ -0.99369181161880105, 0.092518793899417626, 0.063378673835467206 ]
-lookat = [ -1.043328164965434, 1.1011642697614414, -0.52209011072167588 ]
-up = [ 0.062787194896183215, -0.0092928174816590079, 0.99798367306300229 ]
-zoom = 0.21999999999999958
+# front = [ -0.99369181161880105, 0.092518793899417626, 0.063378673835467206 ]
+# lookat = [ -1.043328164965434, 1.1011642697614414, -0.52209011072167588 ]
+# up = [ 0.062787194896183215, -0.0092928174816590079, 0.99798367306300229 ]
+# zoom = 0.21999999999999958
 
 #Exterior
 # front = [ -0.037058935732263293, 0.98288825505266464, 0.18043645242001422 ]
@@ -98,14 +98,18 @@ zoom = 0.21999999999999958
 # up = [ -0.012485710864744209, -0.1810018036369839, 0.98340350523290332 ]
 # zoom = 0.25999999999999956
 
+#Apartment 
+front = [ 0.97166303465393566, 0.15099133113538674, 0.18185864018261191 ]
+lookat =  [ -0.0087864400830399703, 0.02734387141546879, -0.032727855769488556 ]
+up = [ -0.18479881583853494, 0.0055543452195218543, 0.98276067631639485 ]
+zoom = 0.25999999999999962
+
 # draw_positionned_scene(pcd, front, lookat, up, zoom)
 pcd = pcd_downsampled
 o3d.visualization.draw_geometries([pcd],zoom=zoom, front=front, lookat=lookat,up=up)
 
-pt_to_plane_dist = 0.1
 #%% 5. RANSAC Planar Segmentation
-
-distance_threshold = 0.1
+distance_threshold = 0.02
 ransac_n = 3
 num_iterations = 1000
 
@@ -120,9 +124,9 @@ outlier_cloud.paint_uniform_color([0.6, 0.6, 0.6])
 o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud],zoom=zoom, front=front, lookat=lookat,up=up)
 
 #%% 6. Multi-order RANSAC
-max_plane_idx = 10
+max_plane_idx = 6
 # pt_to_plane_dist = nn_distance + np.std(pcd.compute_nearest_neighbor_distance())
-pt_to_plane_dist = 0.1
+pt_to_plane_dist = 0.02
 
 segment_models = {}
 segments = {}
@@ -139,22 +143,24 @@ for i in range(max_plane_idx):
 o3d.visualization.draw_geometries([segments[i] for i in range(max_plane_idx)]+[rest],zoom=zoom, front=front, lookat=lookat,up=up)
 
 #%% 7. Euclidean Considerations with DBSCAN
-epsilon = 0.1
-min_cluster_points = 10
+epsilon = 0.05
+min_cluster_points = 5
 
 labels = np.array(pcd.cluster_dbscan(eps=epsilon, min_points=min_cluster_points))
 max_label = labels.max()
 print(f"point cloud has {max_label + 1} clusters")
 
-colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+colors = plt.get_cmap("tab10")(labels / (max_label if max_label > 0 else 1))
 colors[labels < 0] = 0
 pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
 
-o3d.visualization.draw_geometries([pcd],zoom=zoom, front=front, lookat=lookat,up=up)
+o3d.visualization.draw_geometries([segments[i] for i in range(max_plane_idx)]+[pcd],zoom=zoom, front=front, lookat=lookat,up=up)
+
+# o3d.visualization.draw_geometries([pcd],zoom=zoom, front=front, lookat=lookat,up=up)
 
 #%% 8. Using Euclidean Clustering within the RANSAC Definition
-max_plane_idx = 10
-pt_to_plane_dist = 0.1
+max_plane_idx = 6
+pt_to_plane_dist = 0.02
 
 segment_models = {}
 segments = {}
@@ -177,7 +183,7 @@ for i in range(max_plane_idx):
 
 o3d.visualization.draw_geometries([segments[i] for i in range(max_plane_idx)],zoom=zoom, front=front, lookat=lookat,up=up)
 
-# o3d.visualization.draw_geometries([rest])
+o3d.visualization.draw_geometries([rest])
 
 
 #%% Refined RANSAC with Euclidean clustering AND ORDERING
@@ -217,7 +223,7 @@ o3d.visualization.draw_geometries([segments[i] for i in range(max_plane_idx)]+[r
 
 
 #%%2 9. DBSCAN sur rest
-o3d.visualization.draw_geometries([rest],zoom=zoom, front=front, lookat=lookat,up=up)
+# o3d.visualization.draw_geometries([rest],zoom=zoom, front=front, lookat=lookat,up=up)
 
 epsilon = 0.15
 min_cluster_points = 5
@@ -237,10 +243,10 @@ o3d.visualization.draw_geometries([rest],zoom=zoom, front=front, lookat=lookat,u
 
 
 
-# o3d.visualization.draw_geometries([segments[i] for i in range(max_plane_idx)]+[rest],zoom=zoom, front=front, lookat=lookat,up=up)
+o3d.visualization.draw_geometries([segments[i] for i in range(max_plane_idx)]+[rest],zoom=zoom, front=front, lookat=lookat,up=up)
 
 #%% Voxelization with Open3D
-voxel_size=0.5
+voxel_size=0.02
 
 min_bound = pcd.get_min_bound()
 max_bound = pcd.get_max_bound()
@@ -372,6 +378,8 @@ def voxel_modelling(filename, indices, voxel_size):
             voxel_assembly.append(voxel)
     return voxel_assembly
 
-vrsac = voxel_modelling("../RESULTS/ransac_vox.obj", filled_ransac, 1)
-vrest = voxel_modelling("../RESULTS/rest_vox.obj", filled_rest, 1)
-voxel_modelling("../RESULTS/empty_vox.obj", empty_indices, 1)
+vrsac = voxel_modelling("../RESULTS/ransac_vox.obj", filled_ransac, 0.1)
+vrest = voxel_modelling("../RESULTS/rest_vox.obj", filled_rest, 0.1)
+voxel_modelling("../RESULTS/empty_vox.obj", empty_indices, 0.1)
+
+# %%

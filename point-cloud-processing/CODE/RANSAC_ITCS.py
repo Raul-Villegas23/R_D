@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 #%% 2. Point Cloud Import
 
-DATANAME = "ITC_outdoor.ply"
+DATANAME = "ITC_groundfloor.ply"
 pcd = o3d.io.read_point_cloud("DATA/" + DATANAME)
 
 #%% 3. Data Pre-Processing
