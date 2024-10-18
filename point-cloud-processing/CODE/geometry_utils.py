@@ -28,9 +28,9 @@ def optimize_rotation_and_translation(
 ) -> Optional[np.ndarray]:
     """Optimize rotation angle and translation to align two perimeters."""
     angle_range: Tuple[float, float] = (
-        -90,
-        90,
-    )  # Define the range of angles trimesh (-45, 45) and o3d (-90, 90)
+        -180,
+        180,
+    )  # Define the range of angles to search for the optimal solution
     angle_step: float = 45.0  # Define the step size for the angles
 
     # Generate the initial guesses for angles
@@ -69,37 +69,6 @@ def calculate_intersection_error(
     intersection = poly1.intersection(poly2)
     union = poly1.union(poly2)
     return 1 - (intersection.area / union.area) if union.area != 0 else 0
-
-
-def calculate_centroid(perimeter: np.ndarray) -> np.ndarray:
-    """Calculate the centroid of a given perimeter using Shapely."""
-    polygon = Polygon(perimeter)
-    centroid = polygon.centroid
-    return np.array([centroid.x, centroid.y])
-
-
-def compute_orientation(
-    vertices: np.ndarray,
-) -> Tuple[float, Tuple[np.ndarray, np.ndarray]]:
-    """Compute the orientation of the building based on the azimuth angle of the longest edge relative to the north."""
-    hull = ConvexHull(vertices)
-    hull_vertices = vertices[hull.vertices]
-
-    max_length: float = 0
-    orientation_angle: float = 0
-    longest_edge: Tuple[Optional[np.ndarray], Optional[np.ndarray]] = (None, None)
-
-    for i in range(len(hull_vertices)):
-        for j in range(i + 1, len(hull_vertices)):
-            vec = hull_vertices[j] - hull_vertices[i]
-            length = np.linalg.norm(vec)
-            if length > max_length:
-                max_length = float(length)
-                # Calculate the azimuth angle relative to the north (y-axis)
-                orientation_angle = (np.degrees(np.arctan2(vec[1], vec[0])) + 360) % 360
-                longest_edge = (hull_vertices[i], hull_vertices[j])
-
-    return orientation_angle, (np.array(longest_edge[0]), np.array(longest_edge[1]))
 
 
 def apply_optimal_params_trimesh(
@@ -161,51 +130,3 @@ def apply_optimal_params_trimesh(
     mesh.apply_transform(transformation_matrix)
 
     return mesh, transformation_matrix
-
-
-def compute_z_offset(
-    combined_mesh: trimesh.Trimesh, glb_mesh: trimesh.Trimesh
-) -> float:
-    """
-    Compute the Z offset needed to align the floor of the GLB mesh with the combined mesh.
-
-    Parameters:
-    - combined_mesh: The target mesh (e.g., the mesh representing the terrain/building).
-    - glb_mesh: The source mesh (e.g., the GLB mesh).
-
-    Returns:
-    - z_offset: The calculated Z offset needed to align the two meshes.
-    """
-    # Get the axis-aligned bounding boxes (AABB) of the two meshes
-    combined_bbox = combined_mesh.bounding_box.bounds
-    glb_bbox = glb_mesh.bounding_box.bounds
-
-    # Extract the lowest Z values (the minimum Z coordinate) from the bounding boxes
-    lowest_z_combined = combined_bbox[0, 2]  # Min Z value of combined mesh
-    lowest_z_glb = glb_bbox[0, 2]  # Min Z value of GLB mesh
-
-    # Calculate the Z offset required to align the two meshes
-    z_offset = lowest_z_combined - lowest_z_glb
-
-    return z_offset
-
-
-def apply_z_offset(mesh: trimesh.Trimesh, z_offset: float) -> trimesh.Trimesh:
-    """
-    Apply a Z offset to the given mesh, translating it along the Z-axis.
-
-    Parameters:
-    - mesh: The mesh to which the Z offset should be applied (trimesh.Trimesh).
-    - z_offset: The Z offset value to apply.
-
-    Returns:
-    - mesh: The transformed mesh after applying the Z offset.
-    """
-    # Create a translation matrix for the Z offset
-    translation_matrix = np.eye(4)
-    translation_matrix[2, 3] = z_offset  # Apply Z-axis translation
-
-    # Apply the transformation to the mesh
-    mesh.apply_transform(translation_matrix)
-
-    return mesh

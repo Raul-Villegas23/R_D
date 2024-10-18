@@ -28,7 +28,7 @@ def ransac_plane(points, threshold, iterations):
 
     return best_params, np.array(best_inliers)
 
-pcd = o3d.io.read_point_cloud("DATA/ITC_firstfloor.ply")
+pcd = o3d.io.read_point_cloud("DATA/appartment_cloud.ply")
 o3d.visualization.draw_geometries([pcd])
 points = np.asarray(pcd.points)
 plane_params, inliers = ransac_plane(points, threshold=0.01, iterations=1000)

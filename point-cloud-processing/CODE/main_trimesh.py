@@ -8,14 +8,14 @@ from typing import List, Tuple, Optional, Dict
 import numpy as np
 
 # Import the necessary functions from the custom modules
-from trimesh_fetcher import process_feature_list, print_memory_usage
+from trimesh_fetcher import process_feature_list
 from geolocation import extract_latlon_orientation_from_mesh
-from trimesh_transformations_utils import compute_z_offset, apply_z_offset
 from trimesh_visualization import color_transformed_origin_vertex, visualize_trimesh_objects
 from trimesh_alignment import refine_alignment_with_icp_trimesh
 from geometry_utils import extract_2d_perimeter, optimize_rotation_and_translation
-from trimesh_processor import load_and_transform_glb_model_trimesh, align_trimesh_centers, apply_optimal_params_trimesh
+from trimesh_processor import load_and_transform_glb_model_trimesh, align_trimesh_centers
 from trimesh_transformations_utils import accumulate_transformations, calculate_rotation_z
+from geometry_utils import apply_optimal_params_trimesh
 
 def process_glb_and_bag(
     feature_ids: List[str],
@@ -43,6 +43,9 @@ def process_glb_and_bag(
         # colored_mesh = color_transformed_origin_vertex(glb_mesh, np.eye(4))
         # # Export the modified mesh with the name of the GLB dataset
         # colored_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_colored.ply")
+
+        #Export bag mesh
+        bag_mesh.export(f"RESULTS/{glb_dataset.split('.')[0]}_bag.ply")
 
 
         if glb_mesh:
@@ -74,18 +77,6 @@ def process_glb_and_bag(
             # Append the ICP transformation to the list of transformations
             transformations.append(icp_transformation)
             
-
-            # Fix the height offset between the BAG and GLB meshes
-            z_offset = compute_z_offset(bag_mesh, glb_mesh)
-            apply_z_offset(glb_mesh, z_offset)
-
-            transformations.append(np.array([
-                [1, 0, 0, 0],
-                [0, 1, 0, 0],
-                [0, 0, 1, z_offset],
-                [0, 0, 0, 1]
-            ], dtype=np.float64))
-
             # Accumulate and save the final transformation matrix
             final_transformation_matrix = accumulate_transformations(transformations)
             logging.info(f"\nFinal transformation matrix:\n{final_transformation_matrix}")
@@ -113,7 +104,6 @@ def process_glb_and_bag(
 
 def main() -> None:
     start_time = time.time()
-    print_memory_usage("start")
 
     collections_url = "https://api.3dbag.nl/collections"
     collection_id = 'pand'
@@ -131,6 +121,10 @@ def main() -> None:
         {
             "feature_ids": ["NL.IMBAG.Pand.0141100000010853", "NL.IMBAG.Pand.0141100000010852"],
             "glb_dataset": "rietstraat31-33.glb"
+        },
+        {
+            "feature_ids": ["NL.IMBAG.Pand.0512100000242132", "NL.IMBAG.Pand.0512100000242133", "NL.IMBAG.Pand.0512100000242134", "NL.IMBAG.Pand.0512100000242135", "NL.IMBAG.Pand.0512100000242136", "NL.IMBAG.Pand.0512100000242137", "NL.IMBAG.Pand.0512100000242138"],
+            "glb_dataset": "langezijds.glb"
         }
     ]
 
@@ -139,13 +133,11 @@ def main() -> None:
         glb_dataset = task["glb_dataset"]
         logging.info(f"Processing GLB dataset {glb_dataset}")
         process_glb_and_bag(feature_ids, glb_dataset, collections_url, collection_id)
-        print_memory_usage(f"after processing {glb_dataset}")
         print("\n")
         # Print the time per task
         logging.info(f"Time for processing {glb_dataset}: {time.time() - start_time:.3f} seconds")
 
     logging.info(f"Total elapsed time: {time.time() - start_time:.3f} seconds")
-    print_memory_usage("end")
 
     gc.collect()
 

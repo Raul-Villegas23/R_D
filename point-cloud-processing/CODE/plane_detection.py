@@ -6,23 +6,93 @@ Created on Tue April 15 14:15:09 2023
 """
 
 #%% 1. Library setup
-import numpy as np
+# -*- coding: utf-8 -*-
+"""
+Created on Tue April 15 14:15:09 2023
+
+@author: Florent Poux
+"""
+
+#%% 1. Library setup
 import open3d as o3d
+import numpy as np
+import pandas as pd
+import laspy
 import matplotlib.pyplot as plt
+import os
+
+# Function to load .laz point cloud
+def load_laz_point_cloud(laz_file_path):
+    with laspy.open(laz_file_path) as las_file:
+        las_data = las_file.read()
+    xyz = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(xyz)
+
+    if hasattr(las_data, 'red') and hasattr(las_data, 'green') and hasattr(las_data, 'blue'):
+        red = las_data.red / 65535.0
+        green = las_data.green / 65535.0
+        blue = las_data.blue / 65535.0
+        rgb = np.vstack((red, green, blue)).transpose()
+        point_cloud.colors = o3d.utility.Vector3dVector(rgb)
+    else:
+        print("No RGB color information found in .laz file.")
+    
+    return point_cloud
+
+# Function to load point cloud from a Pandas DataFrame (.xyz files)
+def load_point_cloud_from_dataframe(pcd_df):
+    pcd_o3d = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(np.array(pcd_df[['X', 'Y', 'Z']])))
+
+    if all(col in pcd_df.columns for col in ['R', 'G', 'B']):
+        pcd_o3d.colors = o3d.utility.Vector3dVector(np.array(pcd_df[['R', 'G', 'B']]) / 255.0)
+    else:
+        print("No RGB color information found in DataFrame.")
+    
+    return pcd_o3d
+
+# Function to load .xyz point cloud
+def load_xyz_point_cloud(xyz_file_path):
+    pcd_df = pd.read_csv(xyz_file_path, delimiter=";", header=0)  # Assume the file has a header row
+    required_columns = ['X', 'Y', 'Z', 'R', 'G', 'B']
+    available_columns = [col for col in required_columns if col in pcd_df.columns]
+    
+    if not all(col in pcd_df.columns for col in ['X', 'Y', 'Z']):
+        raise ValueError("The file must contain 'X', 'Y', 'Z' columns for point coordinates.")
+    
+    return load_point_cloud_from_dataframe(pcd_df[available_columns])
+
+# Main function to load any point cloud or mesh file and convert it into a point cloud
+def load_point_cloud(file_path):
+    # Check file extension and load accordingly
+    if file_path.endswith(".ply"):
+        print("Loading .ply file...")
+        pcd = o3d.io.read_point_cloud(file_path)  # Load PLY as point cloud
+    elif file_path.endswith(".glb"):
+        print("Loading .glb file...")
+        mesh = o3d.io.read_triangle_mesh(file_path)  # Load GLB as mesh
+        pcd = mesh.sample_points_uniformly(number_of_points=100000)  # Convert mesh to point cloud
+    elif file_path.endswith(".xyz"):
+        print("Loading .xyz file...")
+        pcd = load_xyz_point_cloud(file_path)  # Load XYZ as point cloud
+    elif file_path.endswith(".laz"):
+        print("Loading .laz file...")
+        pcd = load_laz_point_cloud(file_path)  # Load LAZ as point cloud
+    else:
+        raise ValueError("Unsupported file format. Please provide a .ply, .glb, .xyz, or .laz file.")
+    
+    return pcd
 
 #%% 2. Point Cloud Import
 
-DATANAME = "pijlkruid_aligned.ply"
+DATANAME = "S1030801 - van hoornestr eo - blok_2.copc (1).laz"
 file_path = "../DATA/" + DATANAME
 
-# Check file extension and load accordingly
-if file_path.endswith(".ply"):
-    pcd = o3d.io.read_point_cloud(file_path)  # Load PLY as point cloud
-elif file_path.endswith(".glb"):
-    mesh = o3d.io.read_triangle_mesh(file_path)  # Load GLB as mesh
-    pcd = mesh.sample_points_uniformly(number_of_points=100000)  # Convert mesh to point cloud
-else:
-    raise ValueError("Unsupported file format. Please provide a .ply or .glb file.")
+# Load the point cloud or mesh
+pcd = load_point_cloud(file_path)
+
+# Print summary of the loaded point cloud
+print(f"Loaded point cloud has {len(pcd.points)} points.")
 
 #%% 3. Data Pre-Processing
 pcd_center = pcd.get_center()
@@ -129,7 +199,7 @@ outlier_cloud.paint_uniform_color([0.6, 0.6, 0.6])
 o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud],zoom=zoom, front=front, lookat=lookat,up=up)
 
 #%% 6. Multi-order RANSAC
-max_plane_idx = 10
+max_plane_idx = 20
 # pt_to_plane_dist = nn_distance + np.std(pcd.compute_nearest_neighbor_distance())
 pt_to_plane_dist = 0.1
 
@@ -335,7 +405,7 @@ for idx in segments:
 rest_w_segments=np.hstack((np.asarray(rest.points),(labels+max_plane_idx).reshape(-1, 1)))
 xyz_segments.append(rest_w_segments)
 
-# np.savetxt("../RESULTS/" + DATANAME.split(".")[0] + ".xyz", np.concatenate(xyz_segments), delimiter=';', fmt='%1.9f')
+np.savetxt("../RESULTS/" + DATANAME.split(".")[0] + ".xyz", np.concatenate(xyz_segments), delimiter=';', fmt='%1.9f')
 
 #%% Creating a 3D mesh voxel model
 

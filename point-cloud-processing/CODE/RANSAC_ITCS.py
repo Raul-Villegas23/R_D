@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 #%% 2. Point Cloud Import
 
 DATANAME = "ITC_groundfloor.ply"
-pcd = o3d.io.read_point_cloud("DATA/" + DATANAME)
+pcd = o3d.io.read_point_cloud("../DATA/" + DATANAME)
+pcd
 
 #%% 3. Data Pre-Processing
 pcd_center = pcd.get_center()
@@ -121,8 +122,8 @@ o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud],zoom=zoom, front
 
 #%% 6. Multi-order RANSAC
 max_plane_idx = 10
-# pt_to_plane_dist = nn_distance + np.std(pcd.compute_nearest_neighbor_distance())
-pt_to_plane_dist = 0.1
+pt_to_plane_dist = nn_distance + np.std(pcd.compute_nearest_neighbor_distance())
+# pt_to_plane_dist = 0.1
 
 segment_models = {}
 segments = {}
